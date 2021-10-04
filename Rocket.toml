@@ -1,0 +1,6 @@
+[default]
+address = "127.0.0.1"
+limits = { forms = "64 kB", json = "1 MiB" }
+
+[release]
+secret_key = "s3SianFJBDeqAk5PrdW0l/3/Go6m/xL2+2WvJyC1nM8="

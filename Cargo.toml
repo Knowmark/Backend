@@ -1,0 +1,55 @@
+[package]
+name = "knowmark-backend"
+version = "0.1.0"
+authors = ["Tin Švagelj <tin.svagelj@live.com>"]
+edition = "2018"
+
+[dependencies]
+# Web
+rocket = { version = "0.5.0-rc.1", features = [
+    "json",
+    "secrets",
+    "uuid",
+] }
+rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", ref = "5843861" }
+rust-crypto = "0.2.36"
+mongodb = "2.0.0"
+tokio = { version = "1.11", features = ["full"] }
+chrono = { version = "0.4.19", features = ["serde"] }
+uuid = { version = "0.8.1", features = [
+    "serde",
+    "v4",
+] }
+base64 = "0.13.0"
+
+# Crypto
+rsa = "0.5.0"
+sha2 = "0.9.6"
+jsonwebtoken = "8.0.0-beta.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bson = { version= "2.0.0", features = ["uuid-0_8", "chrono-0_4"] }
+serde_yaml = "0.8"
+serde_json = "1.0"
+
+# Functionality
+rand = "0.8.4"
+regex = "1.5"
+dotenv = "0.15"
+lazy_static = "1.4"
+async-trait = "0.1.51"
+
+# Logging
+tracing = "0.1"
+tracing-log = "0.1"
+tracing-subscriber = "0.2"
+tracing-futures = "0.2"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Fix for people depending on ancient tokio runtime
+[replace]
+"tokio:0.2.25" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
