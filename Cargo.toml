@@ -1,49 +1,54 @@
+[workspace]
 [package]
-name = "knowmark-backend"
+name = "knowmark_backend"
 version = "0.1.0"
 authors = ["Tin Švagelj <tin.svagelj@live.com>"]
 edition = "2018"
 
 [dependencies]
 # Web
-rocket = { version = "0.5.0-rc.1", features = [
+rocket = { version = "0.5.0-rc", features = [
     "json",
     "secrets",
     "uuid",
 ] }
-rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", ref = "5843861" }
-rust-crypto = "0.2.36"
-mongodb = "2.0.0"
-tokio = { version = "1.11", features = ["full"] }
-chrono = { version = "0.4.19", features = ["serde"] }
-uuid = { version = "0.8.1", features = [
-    "serde",
-    "v4",
-] }
-base64 = "0.13.0"
+rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", rev = "54fae07" }
+rust-crypto = "0.2"
+
+tokio = { version = "1", features = [ "full" ] }
+
+mongodb = { version = "2.3", features = ["zstd-compression"] }
+bson = { version = "2.4", features = ["uuid-1"] }
 
 # Crypto
-rsa = "0.5.0"
-sha2 = "0.9.6"
-jsonwebtoken = "8.0.0-beta.2"
+rsa = "0.6"
+sha2 = "0.10"
+jsonwebtoken = "8.1"
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-bson = { version= "2.0.0", features = ["uuid-0_8", "chrono-0_4"] }
-serde_yaml = "0.8"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_yaml = "0.9"
 serde_json = "1.0"
+base64 = "0.13"
+chrono = { version = "0.4", features = [ "serde" ] }
+uuid = { version = "1.1", features = [
+    "serde",
+    "v4",
+    "v5",
+] }
 
 # Functionality
-rand = "0.8.4"
+rand = "0.8"
 regex = "1.5"
 dotenv = "0.15"
 lazy_static = "1.4"
-async-trait = "0.1.51"
+derive_more = "0.99"
+async-trait = "0.1"
 
 # Logging
 tracing = "0.1"
 tracing-log = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = "0.3"
 tracing-futures = "0.2"
 
 # Error handling
@@ -52,4 +57,9 @@ thiserror = "1.0"
 
 # Fix for people depending on ancient tokio runtime
 [replace]
-"tokio:0.2.25" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
+# "uuid:1.1.0" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
+#"tokio:0.2.25" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
+
+[dev-dependencies]
+wiremock = "0.5"
+lazy_static = "1.4"

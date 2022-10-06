@@ -1,6 +1,6 @@
 use crate::data::{Quiz, QUIZ_COLLECTION_NAME};
-use crate::error::Problem;
-use crate::jwt::{auth_problem, UserRolesToken};
+use crate::resp::jwt::{auth_problem, UserRolesToken};
+use crate::resp::problem::Problem;
 use crate::role::Role;
 use crate::route::parse_uuid;
 use bson::spec::BinarySubtype;

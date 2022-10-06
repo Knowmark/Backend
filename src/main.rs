@@ -18,18 +18,20 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 use crate::config::Config;
-use crate::crypto::Crypto;
+use crate::resp::crypto::Crypto;
 use crate::route::mount_api;
 use std::ops::Deref;
+use crate::error::ConfigurationError;
 
+mod client;
 mod config;
-mod crypto;
 mod data;
 mod error;
-mod jwt;
+mod resp;
 mod role;
 mod route;
 mod user;
+mod util;
 
 lazy_static! {
     pub static ref CRYPTO: Crypto = Crypto::init();
@@ -49,9 +51,18 @@ async fn main() {
     }
 
     tracing::info!("Initializing configuration...");
-    let c = Config::init();
+    let c = match Config::load() {
+        Ok(c) => c,
+        Err(ConfigurationError::NotFound(_)) => {
+            let c = Config::default();
+            if c.save().is_err() {
+                tracing::error!("Unable to save configuration...");
+            }
+            c
+        },
+        Err(other) => std::panic::panic_any(other)
+    };
 
-    // Initialize CRYPTO now so we don't get race conditions and stuff
     let _ = CRYPTO.deref();
 
     tracing::info!("Connecting to MongoDB: {}", c.mongodb_uri);

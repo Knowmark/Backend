@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
 use bson::doc;
-use bson::serde_helpers::uuid_as_binary;
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use uuid::Uuid;
 
-pub static PART_COLLECTION_NAME: &'static str = "parts";
-pub static PARTICIPANT_COLLECTION_NAME: &'static str = "participants";
-pub static QUIZ_COLLECTION_NAME: &'static str = "quizzes";
+pub static PART_COLLECTION_NAME: &str = "parts";
+pub static PARTICIPANT_COLLECTION_NAME: &str = "participants";
+pub static QUIZ_COLLECTION_NAME: &str = "quiz";
 
 fn true_bool() -> bool {
     true
@@ -79,6 +78,7 @@ pub enum Part {
         id: Uuid,
         text: String,
         ans: AnswerType,
+        choices: Vec<AnswerChoice>,
 
         time_limit: Option<Duration>,
 
@@ -89,7 +89,8 @@ pub enum Part {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Answer {
+#[serde(tag = "t", content = "value")]
+pub enum AnswerChoice {
     Bool(bool),
     Number(f64),
     Short(String),
@@ -101,12 +102,11 @@ pub enum Answer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticipantInfo {
-    #[serde(with = "uuid_as_binary")]
     pub id: Uuid,
     #[serde(default = "Utc::now")]
     pub started_on: DateTime<Utc>,
     #[serde(default)]
-    pub answers: HashMap<Uuid, Answer>,
+    pub choices: HashMap<Uuid, AnswerChoice>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

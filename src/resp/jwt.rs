@@ -4,10 +4,9 @@ use rocket::http::{Cookie, CookieJar, Status};
 use rocket::request::{self, FromRequest, Request};
 use serde::{Deserialize, Serialize};
 
-use crate::error::Problem;
+use crate::resp::problem::Problem;
 use crate::role::Role;
 use crate::user::User;
-use bson::serde_helpers::uuid_as_binary;
 use rocket::outcome::Outcome::{Failure, Success};
 use std::borrow::Borrow;
 use uuid::Uuid;
@@ -20,7 +19,6 @@ pub struct UserRolesToken {
     iat: DateTime<Utc>,
     #[serde(with = "jwt_numeric_date")]
     exp: DateTime<Utc>,
-    #[serde(with = "uuid_as_binary")]
     pub user: Uuid,
     pub role: Role,
 }
@@ -53,7 +51,7 @@ impl UserRolesToken {
     }
 }
 
-pub fn auth_problem<S: Into<String>>(detail: S) -> Problem {
+pub fn auth_problem(detail: impl ToString) -> Problem {
     Problem::new_untyped(Status::Unauthorized, "Unable to authorize user.")
         .detail(detail)
         .clone()

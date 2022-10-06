@@ -1,8 +1,9 @@
-use rsa::pkcs1::ToRsaPrivateKey;
-use rsa::pkcs8::ToPublicKey;
+use rsa::pkcs1::{EncodeRsaPrivateKey, LineEnding};
+use rsa::pkcs8::{EncodePublicKey};
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::{env, fs};
+use rsa::pkcs1::der::Document;
 
 const PASSWORD_SALT: &'static str = "password.salt";
 const USER_AUTH_PUBLIC: &'static str = "user_auth.pem.pub";
@@ -68,7 +69,7 @@ impl Crypto {
 
             tracing::info!("Creating PS256 private key...");
             private = rsa_sk
-                .to_pkcs1_pem()
+                .to_pkcs1_pem(LineEnding::LF)
                 .expect("unable to generate PS256 private key")
                 .to_string()
                 .bytes()
@@ -82,7 +83,8 @@ impl Crypto {
                 .to_public_key()
                 .to_public_key_der()
                 .expect("unable to generate PS256 public key")
-                .to_pem()
+                .to_pem(LineEnding::LF)
+                .expect("unable to crate a valid UTF8 pem key")
                 .as_bytes()
                 .to_vec();
 

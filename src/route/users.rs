@@ -1,18 +1,20 @@
 use bson::spec::BinarySubtype;
 use bson::{doc, Bson, Document};
+use mongodb::options::FindOptions;
 use mongodb::Database;
 use regex::Regex;
 use rocket::form::Form;
+use rocket::futures::StreamExt;
 use rocket::http::{CookieJar, Status};
 use rocket::State;
 use uuid::Uuid;
 
 use crate::config::Config;
-use crate::error::Problem;
-use crate::jwt::UserRolesToken;
+use crate::resp::jwt::UserRolesToken;
+use crate::resp::problem::Problem;
 use crate::role::Role;
-use crate::route::parse_uuid;
-use crate::user::{user_pw_hash, User, USER_COLLECTION_NAME};
+use crate::route::{parse_uuid, PageState};
+use crate::user::{PasswordHash, User, USER_COLLECTION_NAME};
 
 lazy_static! {
     static ref EMAIL_REGEX: Regex = Regex::new(r"^[A-z0-9_.+-]+@[A-z0-9-.]+\.\w{2,64}$").unwrap();
@@ -63,9 +65,9 @@ pub fn filter_user_username(username: String) -> Document {
 }
 
 #[inline]
-pub fn filter_user_email(email: String) -> Document {
+pub fn filter_user_email(email: impl ToString) -> Document {
     doc! {
-        "email": email
+        "email": email.to_string()
     }
 }
 
@@ -78,7 +80,7 @@ pub async fn user_get(id: String, db: &State<Database>) -> Result<Option<User>, 
         .collection(USER_COLLECTION_NAME)
         .find_one(filter_user_id(uuid), None)
         .await
-        .map_err(|e| Problem::from(e))?;
+        .map_err(Problem::from)?;
 
     match user_document {
         Some(doc) => Ok(Some(
@@ -102,29 +104,23 @@ impl std::fmt::Debug for UserSignupInfo<'_> {
 }
 
 #[inline]
-fn bad_email_problem<Email: Into<String>, Detail: Into<String>>(
-    email: Email,
-    detail: Detail,
-) -> Problem {
+fn bad_email_problem(email: impl ToString, detail: impl ToString) -> Problem {
     Problem::new_untyped(Status::BadRequest, "Bad email.")
-        .insert_serialized("email", email.into())
+        .insert_serialized("email", email.to_string())
         .detail(detail)
         .clone()
 }
 
 #[inline]
-fn bad_username_problem<Username: Into<String>, Detail: Into<String>>(
-    username: Username,
-    detail: Detail,
-) -> Problem {
+fn bad_username_problem(username: impl ToString, detail: impl ToString) -> Problem {
     Problem::new_untyped(Status::BadRequest, "Bad username.")
-        .insert_serialized("username", username.into())
+        .insert_serialized("username", username.to_string())
         .detail(detail)
         .clone()
 }
 
 #[inline]
-fn bad_password_problem<S: Into<String>>(detail: S) -> Problem {
+fn bad_password_problem(detail: impl ToString) -> Problem {
     Problem::new_untyped(Status::BadRequest, "Bad password.")
         .detail(detail)
         .clone()
@@ -152,26 +148,26 @@ impl UserSignupInfo<'_> {
     pub fn validate(&self) -> Result<(), Problem> {
         if !EMAIL_REGEX.is_match(self.email) {
             return Err(bad_email_problem(
-                self.email.clone(),
+                self.email.to_string(),
                 "Email format not supported.",
             ));
         }
 
         if self.username.len() < 5 {
             return Err(bad_username_problem(
-                self.username.clone(),
+                self.username.to_string(),
                 "Username must be at least 5 characters (bytes) long.",
             ));
         }
 
         if self.username.len() > 32 {
             return Err(bad_username_problem(
-                self.username.clone(),
+                self.username.to_string(),
                 "Username can't be longer than 32 (bytes) characters.",
             ));
         }
 
-        if self.password.len() < 8 {
+        if self.password.len() <= 8 {
             return Err(bad_password_problem(
                 "Password must be at least 8 characters (bytes) long.",
             ));
@@ -197,17 +193,22 @@ pub async fn user_create<'a>(
 ) -> Result<User, Problem> {
     create_user.validate()?;
 
-    if db
+    if let Some(existing) = db
         .collection::<User>(USER_COLLECTION_NAME)
-        .find_one(filter_user_email(create_user.email.to_string()), None)
+        .find_one(filter_user_email(&create_user.email), None)
         .await
         .expect("Unable to query by email")
-        .is_some()
     {
-        return Err(bad_email_problem(
-            create_user.email.clone(),
-            "Email already registered.",
-        ));
+        return if existing.pw_hash == PasswordHash::new(create_user.password) {
+            let urt = UserRolesToken::new(&existing);
+            cookies.add_private(urt.cookie()?);
+            Ok(existing)
+        } else {
+            Err(bad_email_problem(
+                create_user.email.to_string(),
+                "Email already registered.",
+            ))
+        };
     }
 
     if db
@@ -218,15 +219,15 @@ pub async fn user_create<'a>(
         .is_some()
     {
         return Err(bad_username_problem(
-            create_user.username.clone(),
+            create_user.username.to_string(),
             "Username already used.",
         ));
     }
 
     let mut user = User::new(
-        create_user.email.clone(),
-        create_user.username.clone(),
-        create_user.password.clone(),
+        create_user.email.to_string(),
+        create_user.username.to_string(),
+        create_user.password.to_string(),
     );
 
     if c.admin_usernames.contains(&user.username) {
@@ -309,7 +310,7 @@ pub async fn login_submit<'a>(
     let id_user: User =
         bson::from_document(user_document).expect("Unable to deserialize BSON into User struct");
 
-    if id_user.pw_hash != user_pw_hash(login_user.password.clone()) {
+    if id_user.pw_hash != PasswordHash::new(login_user.password.clone()) {
         return Err(login_problem(is_email));
     }
 

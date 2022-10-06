@@ -52,7 +52,6 @@ Responses of most of the specified rotes are dependant on information (e.g. head
 | ✅ | Fully implemented |
 | 🖥 | Backend implemented<br>Frontend in development |
 | 🚀️ | Backend implemented |
-| ⚙️ | Development in process |
 | 🧩 | All pieces are in place |
 | 💡 | Planned |
 
