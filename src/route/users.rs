@@ -1,11 +1,8 @@
-use bson::spec::BinarySubtype;
-use bson::{doc, Bson, Document};
-use mongodb::options::FindOptions;
+use bson::{doc, Document};
 use mongodb::Database;
-use regex::Regex;
 use rocket::form::Form;
-use rocket::futures::StreamExt;
 use rocket::http::{CookieJar, Status};
+use rocket::serde::json::Json;
 use rocket::State;
 use uuid::Uuid;
 
@@ -13,12 +10,8 @@ use crate::config::Config;
 use crate::resp::jwt::UserRolesToken;
 use crate::resp::problem::Problem;
 use crate::role::Role;
-use crate::route::{parse_uuid, PageState};
+use crate::route::parse_uuid;
 use crate::user::{PasswordHash, User, USER_COLLECTION_NAME};
-
-lazy_static! {
-    static ref EMAIL_REGEX: Regex = Regex::new(r"^[A-z0-9_.+-]+@[A-z0-9-.]+\.\w{2,64}$").unwrap();
-}
 
 /* TODO: Support paging
 // Responder isn't implemented for Vec.
@@ -50,17 +43,14 @@ pub async fn user_list(db: &State<Database>) -> Result<Vec<User>, Problem> {
 #[inline]
 pub fn filter_user_id(id: Uuid) -> Document {
     doc! {
-        "id": Bson::Binary(bson::Binary {
-            subtype: BinarySubtype::Uuid,
-            bytes: id.as_bytes().to_vec(),
-        })
+        "_id": bson::Uuid::from(id)
     }
 }
 
 #[inline]
-pub fn filter_user_username(username: String) -> Document {
+pub fn filter_user_username(username: impl ToString) -> Document {
     doc! {
-        "username": username
+        "username": username.to_string()
     }
 }
 
@@ -146,10 +136,10 @@ fn login_problem(is_email: bool) -> Problem {
 
 impl UserSignupInfo<'_> {
     pub fn validate(&self) -> Result<(), Problem> {
-        if !EMAIL_REGEX.is_match(self.email) {
+        if !self.email.contains("@") {
             return Err(bad_email_problem(
                 self.email.to_string(),
-                "Email format not supported.",
+                "Not a valid e-mail address.",
             ));
         }
 
@@ -183,6 +173,25 @@ impl UserSignupInfo<'_> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UserCreatedResponse {
+    pub id: Uuid,
+    pub email: String,
+    pub username: String,
+    pub user_role: Role,
+}
+
+impl From<User> for UserCreatedResponse {
+    fn from(value: User) -> Self {
+        UserCreatedResponse {
+            id: value.id,
+            email: value.email,
+            username: value.username,
+            user_role: value.user_role,
+        }
+    }
+}
+
 #[post("/", data = "<create_user>")]
 #[tracing::instrument]
 pub async fn user_create<'a>(
@@ -190,7 +199,7 @@ pub async fn user_create<'a>(
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
     c: &State<Config>,
-) -> Result<User, Problem> {
+) -> Result<Json<UserCreatedResponse>, Problem> {
     create_user.validate()?;
 
     if let Some(existing) = db
@@ -202,7 +211,7 @@ pub async fn user_create<'a>(
         return if existing.pw_hash == PasswordHash::new(create_user.password) {
             let urt = UserRolesToken::new(&existing);
             cookies.add_private(urt.cookie()?);
-            Ok(existing)
+            Ok(Json(UserCreatedResponse::from(existing)))
         } else {
             Err(bad_email_problem(
                 create_user.email.to_string(),
@@ -234,6 +243,9 @@ pub async fn user_create<'a>(
         user.user_role = Role::Admin;
     }
 
+    let urt = UserRolesToken::new(&user);
+    cookies.add_private(urt.cookie()?);
+
     db.collection(USER_COLLECTION_NAME)
         .insert_one(
             bson::to_document(&user).expect("User must be serializable to BSON"),
@@ -242,10 +254,7 @@ pub async fn user_create<'a>(
         .await
         .map_err(|e| Problem::from(e))?;
 
-    let urt = UserRolesToken::new(&user.clone());
-    cookies.add_private(urt.cookie()?);
-
-    Ok(user)
+    Ok(Json(UserCreatedResponse::from(user)))
 }
 
 #[derive(Clone, FromForm)]
@@ -262,7 +271,7 @@ impl std::fmt::Debug for UserLoginInfo {
 
 impl UserLoginInfo {
     fn is_email(&self) -> bool {
-        EMAIL_REGEX.is_match(self.identifier.as_str())
+        self.identifier.contains("@")
     }
 
     pub fn validate(&self, is_email: bool) -> Result<(), Problem> {
@@ -338,5 +347,105 @@ pub async fn user_delete(id: String, db: &State<Database>) -> Result<User, Probl
             Ok(user)
         }
         None => Err(user_not_found(uuid)),
+    }
+}
+
+#[cfg(test)]
+mod user {
+    use crate::route::users::{filter_user_id, UserCreatedResponse};
+    use mongodb::Database;
+    use rocket::{
+        http::{ContentType, Header, Status},
+        local::asynchronous::Client,
+    };
+    use uuid::Uuid;
+
+    use crate::user::{User, USER_COLLECTION_NAME};
+
+    async fn delete_user_entry(db: &Database, id: Uuid) {
+        let delete_result = db
+            .collection::<User>(USER_COLLECTION_NAME)
+            .delete_one(filter_user_id(id), None)
+            .await
+            .expect("unable to perform delete user operation");
+
+        assert_eq!(delete_result.deleted_count, 1, "delete created user");
+    }
+
+    #[rocket::async_test]
+    async fn user_create_works() {
+        let client = Client::tracked(crate::create().await)
+            .await
+            .expect("valid backend");
+        let db: &Database = client.rocket().state().unwrap();
+
+        let response = client
+            .post("/api/v1/user")
+            .header(Header::new(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            ))
+            .body("email=example.user@example.com&username=example_user&password=3x4mpleUs3r")
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok, "ok response");
+        assert_eq!(
+            response.content_type(),
+            Some(ContentType::JSON),
+            "application/json response"
+        );
+        assert!(
+            response.cookies().get_private("jwt_auth").is_some(),
+            "jwt_auth cookie present"
+        );
+
+        let response_data: UserCreatedResponse =
+            response.into_json().await.expect("invalid response json");
+
+        delete_user_entry(db, response_data.id).await;
+    }
+
+    #[rocket::async_test]
+    async fn user_create_can_login() {
+        let client = Client::tracked(crate::create().await)
+            .await
+            .expect("valid backend");
+        let db: &Database = client.rocket().state().unwrap();
+
+        client
+            .post("/api/v1/user")
+            .header(Header::new(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            ))
+            .body("email=example.user@example.com&username=example_user&password=3x4mpleUs3r")
+            .dispatch()
+            .await;
+
+        let response = client
+            .post("/api/v1/user")
+            .header(Header::new(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            ))
+            .body("email=example.user@example.com&username=example_user&password=3x4mpleUs3r")
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Ok, "ok response");
+        assert_eq!(
+            response.content_type(),
+            Some(ContentType::JSON),
+            "application/json response"
+        );
+        assert!(
+            response.cookies().get_private("jwt_auth").is_some(),
+            "jwt_auth cookie present"
+        );
+
+        let response_data: UserCreatedResponse =
+            response.into_json().await.expect("invalid response json");
+
+        delete_user_entry(db, response_data.id).await;
     }
 }

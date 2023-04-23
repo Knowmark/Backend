@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::path::PathBuf;
 use thiserror::Error;
 

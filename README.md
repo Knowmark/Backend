@@ -1,13 +1,16 @@
 # Knowmark Backend
 
-Application I decided to write for my Dynamic Web Applications class. It is also something that will help tremendously
-with grading assignments for Computer Networks class where non-standard implementation of regex by Moodle doesn't cut
-it.
+Application I chose to write for my Dynamic Web Applications class.
 
-The purpose of this project is providing a versatile quiz server which allows authors (e.g. teachers) to publish graded
-quizzes and users (e.g. students) to solve them. Server then automatically validates submitted solutions where
+The purpose of this project is providing a versatile quiz server which allows authors (i.e. teachers) to publish graded
+quizzes and users (i.e. students) to solve them. Server then automatically validates submitted solutions where
 possible (based on several different validation methods), allows quiz author to manually grade ungraded answers, modify
 grades on incorrectly graded answers, and finally send out grading results in bulk and generate a report.
+
+## Setup
+
+Requires a running MongoDB instance. Development is based off of 6.0.5 version.
+
 
 ## Routes️
 
@@ -66,6 +69,7 @@ Passwords are hashed using [bcrypt](https://en.wikipedia.org/wiki/Bcrypt) with 1
 
 #### Validation
 
+- Email must contain `@`
 - Username must match regex: `[\w\d_\-.]{5,32}`
 - Password must be of length in range: \[8, 50]
     - Max. length restriction will be increased once pre-hashing is implemented.

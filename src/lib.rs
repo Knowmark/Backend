@@ -12,42 +12,33 @@ extern crate lazy_static;
 use bson::doc;
 use mongodb::Client;
 use rocket::http::Method;
+use rocket::Rocket;
 use rocket_cors::{AllowedHeaders, AllowedOrigins};
 use std::process::exit;
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
 
 use crate::config::Config;
+use crate::error::ConfigurationError;
 use crate::resp::crypto::Crypto;
 use crate::route::mount_api;
 use std::ops::Deref;
-use crate::error::ConfigurationError;
 
-mod client;
-mod config;
-mod data;
-mod error;
-mod resp;
-mod role;
-mod route;
-mod user;
-mod util;
+pub mod config;
+pub mod data;
+pub mod error;
+pub mod resp;
+pub mod role;
+pub mod route;
+pub mod user;
+pub mod util;
 
 lazy_static! {
     pub static ref CRYPTO: Crypto = Crypto::init();
 }
 
-#[rocket::main]
-async fn main() {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
+pub async fn create() -> Rocket<rocket::Build> {
     tracing::info!("Reading .env file...");
     if dotenv::dotenv().is_err() {
-        tracing::error!("Unable to load .env file.")
+        tracing::warn!("Unable to load .env file.")
     }
 
     tracing::info!("Initializing configuration...");
@@ -59,8 +50,8 @@ async fn main() {
                 tracing::error!("Unable to save configuration...");
             }
             c
-        },
-        Err(other) => std::panic::panic_any(other)
+        }
+        Err(other) => std::panic::panic_any(other),
     };
 
     let _ = CRYPTO.deref();
@@ -101,10 +92,5 @@ async fn main() {
     r = r.attach(cors);
     r = mount_api(r);
 
-    match r.launch().await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::error!("Error launching HTTP server: {}", e);
-        }
-    };
+    r
 }

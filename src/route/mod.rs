@@ -1,13 +1,16 @@
+use base64::{alphabet::Alphabet, engine::GeneralPurposeConfig, Engine};
 use rocket::{Build, Request, Rocket};
 
-mod files;
-mod quiz;
-mod users;
+pub mod files;
+pub mod quiz;
+pub mod users;
 
-use crate::resp::problem::{problems, Problem};
+use crate::{
+    resp::problem::{problems, Problem},
+    util::base64_engine,
+};
 use files::*;
 use quiz::*;
-use rocket::form::{Options, ValueField};
 use rocket::request::{FromRequest, Outcome};
 use std::convert::{Infallible, TryInto};
 use users::*;
@@ -57,12 +60,11 @@ impl<'r> FromRequest<'r> for PageState {
 }
 
 #[inline]
-pub fn parse_uuid<Id: Into<String> + Clone>(id: Id) -> Result<Uuid, Problem> {
-    let id = id.into();
-    match base64::decode(id.as_str())?.try_into() {
+pub fn parse_uuid(id: impl AsRef<str>) -> Result<Uuid, Problem> {
+    match base64_engine().decode(id.as_ref())?.try_into() {
         Ok(bytes) => Ok(Uuid::from_bytes(bytes)),
         Err(_) => Err(problems::parse_problem()
-            .insert_serialized("parsed", id.as_str())
+            .insert_serialized("parsed", id.as_ref())
             .detail("UUID parsing failed.")
             .clone()),
     }

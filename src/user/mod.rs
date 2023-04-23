@@ -1,6 +1,6 @@
 use crate::resp::problem::Problem;
 use bson::spec::BinarySubtype;
-use bson::{doc, Binary, Bson, Document};
+use bson::{doc, Binary, Bson};
 use crypto::bcrypt::bcrypt;
 use rocket::http::{ContentType, Status};
 use rocket::response::Responder;
@@ -70,7 +70,7 @@ fn password_lost_err() -> Problem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
-    #[serde(rename = "_id")]
+    #[serde(rename = "_id", with = "bson::serde_helpers::uuid_1_as_binary")]
     pub id: Uuid,
     pub email: String,
     pub username: String,
@@ -101,20 +101,6 @@ impl User {
             "user_role": self.user_role,
         })
         .to_string()
-    }
-}
-
-impl Into<Bson> for User {
-    fn into(self) -> Bson {
-        let role: u8 = self.user_role.into();
-
-        Bson::Document(doc! {
-            "_id": Binary::from(self.id),
-            "email": self.email,
-            "username": self.username,
-            "pw_hash": self.pw_hash,
-            "user_role": role as i32,
-        })
     }
 }
 
