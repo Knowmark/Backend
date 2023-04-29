@@ -4,7 +4,7 @@ image: "rust:latest"
 # Only needed when using a docker container to run your tests in.
 # Check out: https://docs.gitlab.com/ee/ci/services/index.html
 services:
-  - mongodb:latest
+  - mongo:latest
 #   - redis:latest
 #   - postgres:latest
 

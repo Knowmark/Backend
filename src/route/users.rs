@@ -328,6 +328,10 @@ mod user_endpoints {
             Status::Unauthorized,
             "expected unauthorized response"
         );
+
+        db.delete_user(user.id())
+            .await
+            .expect("unable to delete test user");
     }
 
     #[rocket::async_test]
