@@ -1,4 +1,5 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+#![allow(incomplete_features)]
+#![feature(proc_macro_hygiene, decl_macro, async_fn_in_trait)]
 
 extern crate tracing_futures;
 
@@ -28,7 +29,6 @@ pub mod error;
 pub mod resp;
 pub mod role;
 pub mod route;
-pub mod user;
 pub mod util;
 
 lazy_static! {

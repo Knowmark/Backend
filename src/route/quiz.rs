@@ -1,5 +1,5 @@
-use crate::data::{Quiz, QUIZ_COLLECTION_NAME};
-use crate::resp::jwt::{auth_problem, UserRolesToken};
+use crate::data::quiz::{Quiz, QUIZ_COLLECTION_NAME};
+use crate::resp::jwt::{auth_problem, UserRoleToken};
 use crate::resp::problem::Problem;
 use crate::role::Role;
 use crate::route::parse_uuid;
@@ -30,7 +30,6 @@ pub async fn quiz_list(db: &State<Database>) -> Result<Json<Vec<Quiz>>, Problem>
         match from_bson(quiz_document) {
             Ok(user) => quizzes.push(user),
             Err(_) => {
-                // show must go on?
                 warn!("Unable to deserialize Quiz document.")
             }
         }
@@ -43,7 +42,7 @@ pub async fn quiz_list(db: &State<Database>) -> Result<Json<Vec<Quiz>>, Problem>
 #[tracing::instrument]
 pub async fn quiz_create(
     quiz: Json<Quiz>,
-    auth: UserRolesToken,
+    auth: UserRoleToken,
     db: &State<Database>,
 ) -> Result<(), Problem> {
     if auth.role < Role::Author {
@@ -73,12 +72,10 @@ pub fn quiz_id_filter(id: Uuid) -> Document {
 
 #[post("/<id>")]
 #[tracing::instrument]
-pub async fn quiz_info(id: String, db: &State<Database>) -> Result<Option<Json<Quiz>>, Problem> {
-    let uuid = parse_uuid(&id)?;
-
+pub async fn quiz_info(id: Uuid, db: &State<Database>) -> Result<Option<Json<Quiz>>, Problem> {
     let quiz_document = db
         .collection(QUIZ_COLLECTION_NAME)
-        .find_one(quiz_id_filter(uuid), None)
+        .find_one(quiz_id_filter(id), None)
         .await
         .expect("Unable to query by id");
 
@@ -93,19 +90,13 @@ pub async fn quiz_info(id: String, db: &State<Database>) -> Result<Option<Json<Q
 #[delete("/<id>")]
 #[tracing::instrument]
 pub async fn quiz_delete(
-    id: String,
-    auth: UserRolesToken,
+    id: Uuid,
+    auth: UserRoleToken,
     db: &State<Database>,
 ) -> Result<Option<String>, Problem> {
-    if auth.role < Role::Author {
-        return Err(auth_problem("Permission level too low."));
-    }
-
-    let uuid = parse_uuid(&id)?;
-
     let quiz_document = db
         .collection(QUIZ_COLLECTION_NAME)
-        .find_one(quiz_id_filter(uuid), None)
+        .find_one(quiz_id_filter(id), None)
         .await
         .expect("Unable to query by id");
 
@@ -119,9 +110,9 @@ pub async fn quiz_delete(
     }
 
     db.collection::<Quiz>(QUIZ_COLLECTION_NAME)
-        .delete_one(quiz_id_filter(uuid), None)
+        .delete_one(quiz_id_filter(id), None)
         .await
         .map_err(|e| Problem::from(e))?;
 
-    Ok(Some(uuid.to_string()))
+    Ok(Some(id.to_string()))
 }

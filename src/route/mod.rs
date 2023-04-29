@@ -1,5 +1,5 @@
-use base64::{alphabet::Alphabet, engine::GeneralPurposeConfig, Engine};
-use rocket::{Build, Request, Rocket};
+use base64::Engine;
+use rocket::{Build, Rocket};
 
 pub mod files;
 pub mod quiz;
@@ -11,60 +11,16 @@ use crate::{
 };
 use files::*;
 use quiz::*;
-use rocket::request::{FromRequest, Outcome};
-use std::convert::{Infallible, TryInto};
+use std::convert::TryInto;
 use users::*;
 use uuid::Uuid;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct PageState {
-    pub page_length: u32,
-    pub page: u32,
-}
-
-impl Default for PageState {
-    fn default() -> Self {
-        PageState {
-            page_length: 20,
-            page: 0,
-        }
-    }
-}
-
-#[async_trait]
-impl<'r> FromRequest<'r> for PageState {
-    type Error = Infallible;
-
-    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        let length: Option<u32> = request
-            .query_value("len")
-            .map(|it| it.ok())
-            .flatten()
-            .or_else(|| request.query_value("l").map(|it| it.ok()).flatten());
-
-        let page: Option<u32> = request
-            .query_value("page")
-            .map(|it| it.ok())
-            .flatten()
-            .or_else(|| request.query_value("p").map(|it| it.ok()).flatten());
-
-        if let Some(p) = page {
-            Outcome::Success(PageState {
-                page_length: length.unwrap_or(20),
-                page: p,
-            })
-        } else {
-            Outcome::Success(Default::default())
-        }
-    }
-}
 
 #[inline]
 pub fn parse_uuid(id: impl AsRef<str>) -> Result<Uuid, Problem> {
     match base64_engine().decode(id.as_ref())?.try_into() {
         Ok(bytes) => Ok(Uuid::from_bytes(bytes)),
         Err(_) => Err(problems::parse_problem()
-            .insert_serialized("parsed", id.as_ref())
+            .insert("parsed", id.as_ref())
             .detail("UUID parsing failed.")
             .clone()),
     }

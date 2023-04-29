@@ -1,12 +1,8 @@
-use std::collections::HashMap;
-
-use bson::doc;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use uuid::Uuid;
 
-pub static PART_COLLECTION_NAME: &str = "parts";
+pub static PART_COLLECTION_NAME: &str = "quiz.parts";
 pub static PARTICIPANT_COLLECTION_NAME: &str = "participants";
 pub static QUIZ_COLLECTION_NAME: &str = "quiz";
 

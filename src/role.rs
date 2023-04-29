@@ -9,20 +9,13 @@ pub enum Role {
     Admin,
 }
 
-impl Into<u8> for Role {
-    fn into(self) -> u8 {
-        match self {
-            Role::None => 0u8,
-            Role::Normal => 1u8,
-            Role::Author => 2u8,
-            Role::Admin => 3u8,
-        }
-    }
+impl Role {
+    const ALL: &[Role] = &[Role::None, Role::Normal, Role::Author, Role::Admin];
 }
 
 impl From<u8> for Role {
     fn from(value: u8) -> Self {
-        vec![Role::None, Role::Normal, Role::Author, Role::Admin][value as usize]
+        Role::ALL[value as usize]
     }
 }
 

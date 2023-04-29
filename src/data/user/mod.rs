@@ -11,11 +11,13 @@ use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 use uuid::Uuid;
 
+pub mod db;
 pub mod profile;
 
 use crate::role::Role;
 
-pub static USER_COLLECTION_NAME: &str = "user";
+use self::db::UserSignupData;
+
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct PasswordHash([u8; 24]);
@@ -79,16 +81,23 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(email: impl ToString, username: impl ToString, password: impl ToString) -> User {
-        let pw_hash = PasswordHash::new(password.to_string());
+    pub fn new(
+        email: impl AsRef<str>,
+        username: impl AsRef<str>,
+        password: impl AsRef<str>,
+    ) -> User {
+        let pw_hash = PasswordHash::new(password);
 
-        let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, username.to_string().as_bytes());
+        let id = Uuid::new_v5(
+            &Uuid::NAMESPACE_OID,
+            [email.as_ref(), username.as_ref()].join("").as_bytes(),
+        );
         tracing::info!("Creating a new user with UUID: {}", id.to_string());
 
         User {
             id,
-            email: email.to_string(),
-            username: username.to_string(),
+            email: email.as_ref().to_string(),
+            username: username.as_ref().to_string(),
             pw_hash,
             user_role: Role::Normal,
         }
@@ -104,6 +113,16 @@ impl User {
     }
 }
 
+impl From<UserSignupData<'_>> for User {
+    fn from(signup_data: UserSignupData<'_>) -> Self {
+        User::new(
+            signup_data.email,
+            signup_data.username,
+            signup_data.password,
+        )
+    }
+}
+
 impl<'r> Responder<'r, 'static> for User {
     fn respond_to(self, _: &Request) -> response::Result<'static> {
         let body: String = self.response_json();
@@ -112,5 +131,31 @@ impl<'r> Responder<'r, 'static> for User {
             .header(ContentType::JSON)
             .sized_body(body.len(), Cursor::new(body))
             .ok()
+    }
+}
+
+pub mod filter {
+    use bson::{doc, Document};
+    use uuid::Uuid;
+
+    #[inline]
+    pub fn by_id(id: Uuid) -> Document {
+        doc! {
+            "_id": bson::Uuid::from(id)
+        }
+    }
+
+    #[inline]
+    pub fn by_username(username: String) -> Document {
+        doc! {
+            "username": username
+        }
+    }
+
+    #[inline]
+    pub fn by_email(email: String) -> Document {
+        doc! {
+            "email": email
+        }
     }
 }

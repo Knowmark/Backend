@@ -24,17 +24,26 @@ pub struct Problem {
     pub body: Map<String, Value>,
 }
 
+impl Default for Problem {
+    fn default() -> Self {
+        Problem {
+            status: Status::InternalServerError,
+            type_uri: "about:blank".to_string(),
+            title: "Problem".to_string(),
+            detail: None,
+            instance_uri: None,
+            body: Map::new(),
+        }
+    }
+}
+
 impl Problem {
     pub fn new(status: Status, type_uri: impl ToString, title: impl ToString) -> Problem {
         Problem {
             status,
             type_uri: type_uri.to_string(),
             title: title.to_string(),
-
-            detail: None,
-            instance_uri: None,
-
-            body: Map::new(),
+            ..Default::default()
         }
     }
 
@@ -44,11 +53,7 @@ impl Problem {
             status,
             type_uri: "about:blank".to_string(),
             title: title.to_string(),
-
-            detail: None,
-            instance_uri: None,
-
-            body: Map::new(),
+            ..Default::default()
         }
     }
 
@@ -57,25 +62,27 @@ impl Problem {
         self
     }
 
-    pub fn instance_uri(&mut self, value: impl ToString) -> &mut Problem {
-        self.instance_uri = Some(value.to_string());
+    pub fn instance_uri(&mut self, value: String) -> &mut Problem {
+        self.instance_uri = Some(value);
         self
     }
 
-    pub fn insert(&mut self, key: impl AsRef<str>, value: Value) -> &mut Problem {
-        self.body.insert(key.as_ref().to_string(), value);
+    pub fn insert_json_value(&mut self, key: impl ToString, value: Value) -> &mut Problem {
+        self.body.insert(key.to_string(), value);
         self
     }
 
-    pub fn insert_serialized<V: Serialize>(
-        &mut self,
-        key: impl AsRef<str>,
-        value: V,
-    ) -> &mut Problem {
+    pub fn insert<V: Serialize>(&mut self, key: impl ToString, value: V) -> &mut Problem {
         self.body.insert(
-            key.as_ref().to_string(),
-            serde_json::to_value(value).expect("Data must be JSON serializable"),
+            key.to_string(),
+            serde_json::to_value(value).expect("data must be JSON serializable"),
         );
+        self
+    }
+
+    pub fn insert_str(&mut self, key: impl ToString, value: impl ToString) -> &mut Problem {
+        self.body
+            .insert(key.to_string(), Value::String(value.to_string()));
         self
     }
 
@@ -85,11 +92,11 @@ impl Problem {
     }
 
     pub fn append_serialized(&mut self, data: impl Serialize) -> &mut Problem {
-        let body = serde_json::to_value(data).expect("Data must be JSON serializable");
+        let body = serde_json::to_value(data).expect("data must be JSON serializable");
 
         match body {
             Value::Object(mut map) => self.body.append(&mut map),
-            _ => panic!("Appended data must be an object when serialized."),
+            _ => panic!("appended data must be an object when serialized."),
         }
 
         self
@@ -130,8 +137,8 @@ impl<'r> Responder<'r, 'static> for Problem {
             );
         }
 
-        let body_string =
-            serde_json::to_string(&body).expect("Problem body must be convertible to a String");
+        let body_string = serde_json::to_string(&body)
+            .expect("JSON map keys and values must be JSON serializable");
 
         Response::build()
             .status(self.status)
@@ -155,6 +162,7 @@ pub mod problems {
     }
 }
 
+#[allow(dead_code)]
 impl From<mongodb::error::Error> for Problem {
     fn from(e: mongodb::error::Error) -> Self {
         use mongodb::error::ErrorKind;
