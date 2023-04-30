@@ -60,11 +60,6 @@ tracing-futures = "0.2"
 anyhow = "1.0"
 thiserror = "1.0"
 
-# Fix for people depending on ancient tokio runtime
-[replace]
-# "uuid:1.1.0" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
-#"tokio:0.2.25" = { git = "https://github.com/tokio-rs/tokio", tag = "tokio-1.11.0" }
-
 [dev-dependencies]
 wiremock = "0.5"
 lazy_static = "1.4"

@@ -1,39 +1,80 @@
 image: "rust:latest"
 
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: https://docs.gitlab.com/ee/ci/services/index.html
-services:
-  - mongo:latest
-#   - redis:latest
-#   - postgres:latest
+stages:
+  - build
+  - test
+  - build_targets
 
-# Optional: Install a C compiler, cmake and git into the container.
-# You will often need this when you (or any of your dependencies) depends on C code.
-# before_script:
-#   - apt-get update -yqq
-#   - apt-get install -yqq --no-install-recommends build-essential
+before_script:
+  - apt-get update -yqq
+  - apt-get install -yqq --no-install-recommends build-essential
 
-# Use cargo to test the project
-test:cargo:
+build-debug:
+  stage: build
   script:
-    - rustup install nightly
-    - rustup override set nightly
-    - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --workspace --verbose
+    - rustc --version && cargo --version # Print version info for debugging
+    - cargo build --verbose
+  artifacts:
+    paths:
+      - target/x86_64-unknown-linux-gnu/debug/knowmark-server
+  cache:
+    key:
+      files:
+        - Cargo.toml
+    paths:
+      - target/debug
 
-# Optional: Use a third party library to generate gitlab junit reports
-# test:junit-report:
-#   script:
-#     Should be specified in Cargo.toml
-#     - cargo install junitify
-#     - cargo test -- --format=json -Z unstable-options --report-time | junitify --out $CI_PROJECT_DIR/tests/
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: $CI_PROJECT_DIR/tests/*.xml
+test-debug:
+  stage: test
+  dependencies:
+    - build-debug
+  services:
+    - mongo:latest
+  script:
+    - sudo systemctl start mongod
+    - RUST_LOG=debug cargo test --workspace --verbose
 
-# deploy:
-#   stage: deploy
-#   script: echo "Define your deployment script!"
-#   environment: production
+build-linux:
+  stage: build_targets
+  script:
+    - rustup target add x86_64-unknown-linux-gnu
+    - cargo build --release --target x86_64-unknown-linux-gnu --verbose
+  artifacts:
+    paths:
+      - target/x86_64-unknown-linux-gnu/debug/knowmark-server
+
+build-windows:
+  stage: build_targets
+  script:
+    - rustup target add x86_64-pc-windows-msvc
+    - cargo build --release --target x86_64-pc-windows-msvc --verbose
+  artifacts:
+    paths:
+      - target/x86_64-pc-windows-msvc/debug/knowmark-server
+
+build-openbsd:
+  stage: build_targets
+  script:
+    - rustup target add x86_64-unknown-openbsd
+    - cargo build --release --target x86_64-unknown-openbsd --verbose
+  artifacts:
+    paths:
+      - target/x86_64-unknown-openbsd/debug/knowmark-server
+
+build-apple-x64:
+  stage: build_targets
+  script:
+    - rustup target add x86_64-apple-darwin
+    - cargo build --release --target x86_64-apple-darwin --verbose
+  artifacts:
+    paths:
+      - target/x86_64-apple-darwin/debug/knowmark-server
+
+build-apple-arm:
+  stage: build_targets
+  script:
+    - rustup target add aarch64-apple-darwin
+    - cargo build --release --target aarch64-apple-darwin --verbose
+  artifacts:
+    paths:
+      - target/aarch64-apple-darwin/debug/knowmark-server
