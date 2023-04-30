@@ -46,11 +46,12 @@ build-linux:
 build-windows:
   stage: build_targets
   script:
-    - rustup target add x86_64-pc-windows-msvc
-    - cargo build --release --target x86_64-pc-windows-msvc --verbose
+    - rustup target add x86_64-pc-windows-gnu
+    - cargo build --release --target x86_64-pc-windows-gnu --verbose
   artifacts:
     paths:
-      - target/x86_64-pc-windows-msvc/debug/knowmark-server
+      - target/x86_64-pc-windows-gnu/debug/knowmark-server.exe
+      - target/x86_64-pc-windows-gnu/debug/knowmark-win-service.exe
 
 build-openbsd:
   stage: build_targets
