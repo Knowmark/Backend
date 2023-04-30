@@ -27,14 +27,13 @@ build-debug:
       files:
         - Cargo.toml
     paths:
-      - target/debug
+      - target
 
 test-debug:
   stage: test
   needs:
     - build-debug
   script:
-    - sudo systemctl start mongod
     - RUST_LOG=debug cargo test --workspace --verbose
 
 build-linux:

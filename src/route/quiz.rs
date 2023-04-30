@@ -2,7 +2,6 @@ use crate::data::quiz::{Quiz, QUIZ_COLLECTION_NAME};
 use crate::resp::jwt::{auth_problem, UserRoleToken};
 use crate::resp::problem::Problem;
 use crate::role::Role;
-use crate::route::parse_uuid;
 use bson::spec::BinarySubtype;
 use bson::{doc, from_bson, Bson, Document};
 use mongodb::Database;

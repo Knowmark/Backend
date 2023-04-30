@@ -15,17 +15,6 @@ use std::convert::TryInto;
 use users::*;
 use uuid::Uuid;
 
-#[inline]
-pub fn parse_uuid(id: impl AsRef<str>) -> Result<Uuid, Problem> {
-    match base64_engine().decode(id.as_ref())?.try_into() {
-        Ok(bytes) => Ok(Uuid::from_bytes(bytes)),
-        Err(_) => Err(problems::parse_problem()
-            .insert("parsed", id.as_ref())
-            .detail("UUID parsing failed.")
-            .clone()),
-    }
-}
-
 pub fn mount_api(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket
         .mount("/api/v1/user", routes![user_get, user_create, user_delete])
