@@ -5,6 +5,11 @@ stages:
   - test
   - build_targets
 
+services:
+  - mongo:latest
+variables:
+  MONGO_INITDB_DATABASE: knowmark
+
 before_script:
   - apt-get update -yqq
   - apt-get install -yqq --no-install-recommends build-essential
@@ -12,8 +17,8 @@ before_script:
 build-debug:
   stage: build
   script:
-    - rustc --version && cargo --version # Print version info for debugging
-    - cargo build --verbose
+    - rustc --version && cargo --version
+    - cargo build --bin knowmark-server --verbose
   artifacts:
     paths:
       - target/x86_64-unknown-linux-gnu/debug/knowmark-server
@@ -26,56 +31,65 @@ build-debug:
 
 test-debug:
   stage: test
-  dependencies:
+  needs:
     - build-debug
-  services:
-    - mongo:latest
   script:
     - sudo systemctl start mongod
     - RUST_LOG=debug cargo test --workspace --verbose
 
 build-linux:
   stage: build_targets
+  needs:
+    - test-debug
   script:
     - rustup target add x86_64-unknown-linux-gnu
-    - cargo build --release --target x86_64-unknown-linux-gnu --verbose
+    - cargo build --release --bin knowmark-server --target x86_64-unknown-linux-gnu --verbose
   artifacts:
     paths:
-      - target/x86_64-unknown-linux-gnu/debug/knowmark-server
+      - target/x86_64-unknown-linux-gnu/release/knowmark-server
 
 build-windows:
   stage: build_targets
+  needs:
+    - test-debug
   script:
     - rustup target add x86_64-pc-windows-gnu
-    - cargo build --release --target x86_64-pc-windows-gnu --verbose
+    - cargo build --release --bin knowmark-server --target x86_64-pc-windows-gnu --verbose
+    - cargo build --release --bin knowmark-win-service --target x86_64-pc-windows-gnu --features windows-service --verbose
   artifacts:
     paths:
-      - target/x86_64-pc-windows-gnu/debug/knowmark-server.exe
-      - target/x86_64-pc-windows-gnu/debug/knowmark-win-service.exe
+      - target/x86_64-pc-windows-gnu/release/knowmark-server.exe
+      - target/x86_64-pc-windows-gnu/release/knowmark-win-service.exe
 
 build-openbsd:
   stage: build_targets
+  needs:
+    - test-debug
   script:
     - rustup target add x86_64-unknown-openbsd
-    - cargo build --release --target x86_64-unknown-openbsd --verbose
+    - cargo build --release --bin knowmark-server --target x86_64-unknown-openbsd --verbose
   artifacts:
     paths:
-      - target/x86_64-unknown-openbsd/debug/knowmark-server
+      - target/x86_64-unknown-openbsd/release/knowmark-server
 
 build-apple-x64:
   stage: build_targets
+  needs:
+    - test-debug
   script:
     - rustup target add x86_64-apple-darwin
-    - cargo build --release --target x86_64-apple-darwin --verbose
+    - cargo build --release --bin knowmark-server --target x86_64-apple-darwin --verbose
   artifacts:
     paths:
-      - target/x86_64-apple-darwin/debug/knowmark-server
+      - target/x86_64-apple-darwin/release/knowmark-server
 
 build-apple-arm:
   stage: build_targets
+  needs:
+    - test-debug
   script:
     - rustup target add aarch64-apple-darwin
-    - cargo build --release --target aarch64-apple-darwin --verbose
+    - cargo build --release --bin knowmark-server --target aarch64-apple-darwin --verbose
   artifacts:
     paths:
-      - target/aarch64-apple-darwin/debug/knowmark-server
+      - target/aarch64-apple-darwin/release/knowmark-server
