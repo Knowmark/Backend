@@ -11,6 +11,7 @@ extern crate serde;
 extern crate lazy_static;
 
 use bson::doc;
+use error::BackendError;
 use mongodb::Client;
 use rocket::http::Method;
 use rocket::Rocket;
@@ -37,7 +38,7 @@ lazy_static! {
     pub static ref CRYPTO: Crypto = Crypto::init();
 }
 
-pub async fn create(log_level: Option<Level>) -> Rocket<rocket::Build> {
+pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, BackendError> {
     if let Some(l) = log_level {
         let subscriber = FmtSubscriber::builder().with_max_level(l).finish();
 
@@ -48,20 +49,26 @@ pub async fn create(log_level: Option<Level>) -> Rocket<rocket::Build> {
 
     tracing::info!("Reading .env file...");
     if dotenv::dotenv().is_err() {
-        tracing::warn!("Unable to load .env file.")
+        tracing::warn!("Unable to load .env file.");
     }
 
-    tracing::info!("Initializing configuration...");
+    tracing::info!("Loading configuration...");
     let c = match Config::load() {
-        Ok(c) => c,
+        Ok(c) => {
+            tracing::info!("Configuration loaded.");
+            c
+        }
         Err(ConfigurationError::NotFound(_)) => {
             let c = Config::default();
             if c.save().is_err() {
-                tracing::error!("Unable to save configuration...");
+                tracing::warn!("Unable to save generated configuration.");
             }
             c
         }
-        Err(other) => std::panic::panic_any(other),
+        Err(other) => {
+            tracing::error!("Configuration error: {}", other);
+            return Err(other.into());
+        }
     };
 
     let _ = CRYPTO.deref();
@@ -102,5 +109,5 @@ pub async fn create(log_level: Option<Level>) -> Rocket<rocket::Build> {
     r = r.attach(cors);
     r = mount_api(r);
 
-    r
+    Ok(r)
 }
