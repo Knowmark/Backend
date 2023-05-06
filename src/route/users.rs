@@ -156,6 +156,7 @@ mod user_endpoints {
         http::{ContentType, Header, Status},
         local::asynchronous::Client,
     };
+    use tracing::Level;
     use uuid::Uuid;
 
     use super::UserSignupData;
@@ -189,7 +190,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_user_create_works() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
@@ -214,6 +215,7 @@ mod user_endpoints {
             response.get_auth_cookie().is_some(),
             "jwt_auth cookie wasn't present"
         );
+        tracing::info!("{:#?}", &response);
 
         let response_data: UserCreatedResponse =
             response.into_json().await.expect("invalid response json");
@@ -225,7 +227,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_user_create_can_login() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
@@ -265,7 +267,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_login_submit_works() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
@@ -310,7 +312,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_user_delete_doesnt_work_for_unauthorized_users() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
@@ -336,7 +338,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_user_delete_works_for_same_user() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
@@ -370,7 +372,7 @@ mod user_endpoints {
 
     #[rocket::async_test]
     async fn v1_user_delete_works_for_admin_user() {
-        let client = Client::tracked(crate::create().await)
+        let client = Client::tracked(crate::create(Some(Level::TRACE)).await)
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();

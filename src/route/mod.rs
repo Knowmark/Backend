@@ -5,15 +5,9 @@ pub mod files;
 pub mod quiz;
 pub mod users;
 
-use crate::{
-    resp::problem::{problems, Problem},
-    util::base64_engine,
-};
 use files::*;
 use quiz::*;
-use std::convert::TryInto;
 use users::*;
-use uuid::Uuid;
 
 pub fn mount_api(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket

@@ -16,6 +16,8 @@ use rocket::http::Method;
 use rocket::Rocket;
 use rocket_cors::{AllowedHeaders, AllowedOrigins};
 use std::process::exit;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 use crate::config::Config;
 use crate::error::ConfigurationError;
@@ -35,7 +37,15 @@ lazy_static! {
     pub static ref CRYPTO: Crypto = Crypto::init();
 }
 
-pub async fn create() -> Rocket<rocket::Build> {
+pub async fn create(log_level: Option<Level>) -> Rocket<rocket::Build> {
+    if let Some(l) = log_level {
+        let subscriber = FmtSubscriber::builder().with_max_level(l).finish();
+
+        if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
+            eprintln!("Unable to set global logger: {}", err);
+        };
+    }
+
     tracing::info!("Reading .env file...");
     if dotenv::dotenv().is_err() {
         tracing::warn!("Unable to load .env file.")
