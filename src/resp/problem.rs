@@ -7,13 +7,15 @@ use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::response::Responder;
 use rocket::{response, Request, Response};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::fmt::{Display, Formatter};
+use utoipa::ToSchema;
 
 /// Implements [RFC7807](https://tools.ietf.org/html/rfc7807).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Problem {
+    #[serde(skip)]
     pub status: Status,
     pub type_uri: String,
     pub title: String,
@@ -263,5 +265,11 @@ impl From<jsonwebtoken::errors::Error> for Problem {
 impl From<DecodeError> for Problem {
     fn from(_: DecodeError) -> Self {
         Problem::new_untyped(Status::BadRequest, "Malformed base64 encoded string.")
+    }
+}
+
+impl From<std::io::Error> for Problem {
+    fn from(_: std::io::Error) -> Self {
+        Problem::new_untyped(Status::InternalServerError, "Server IO error")
     }
 }

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use mongodb::Database;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::resp::jwt::UserRoleToken;
@@ -60,10 +61,12 @@ pub mod problem {
     }
 }
 
-#[derive(Clone, FromForm)]
+#[derive(Clone, FromForm, ToSchema)]
 pub struct UserSignupData<'r> {
+    #[schema(format = "email")]
     pub email: Cow<'r, str>,
     pub username: Cow<'r, str>,
+    #[schema(format = "password")]
     pub password: Cow<'r, str>,
 }
 
@@ -123,26 +126,27 @@ impl UserSignupData<'_> {
     }
 }
 
-#[derive(Clone, FromForm)]
+#[derive(Clone, FromForm, ToSchema)]
 pub struct UserLoginData {
-    pub identifier: String,
+    pub username: String,
+    #[schema(format = "password")]
     pub password: String,
 }
 
 impl std::fmt::Debug for UserLoginData {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UserLoginInfo:{}", self.identifier)
+        write!(f, "UserLoginInfo:{}", self.username)
     }
 }
 
 impl UserLoginData {
     pub fn is_email(&self) -> bool {
-        self.identifier.contains("@")
+        self.username.contains("@")
     }
 
     pub fn validate(&self, is_email: bool) -> Result<(), Problem> {
-        if self.identifier.len() < 5
-            || self.identifier.len() > 32
+        if self.username.len() < 5
+            || self.username.len() > 32
             || self.password.len() < 8
             || self.password.len() > 50
         {
@@ -150,25 +154,6 @@ impl UserLoginData {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct UserCreatedResponse {
-    pub id: Uuid,
-    pub email: String,
-    pub username: String,
-    pub user_role: Role,
-}
-
-impl From<User> for UserCreatedResponse {
-    fn from(value: User) -> Self {
-        UserCreatedResponse {
-            id: value.id,
-            email: value.email,
-            username: value.username,
-            user_role: value.user_role,
-        }
     }
 }
 

@@ -1,7 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rocket::http::{Cookie, CookieJar, Status};
-use rocket::local::asynchronous::LocalResponse;
 use rocket::request::{self, FromRequest, Request};
 use rocket::time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
@@ -39,7 +38,7 @@ impl UserRoleToken {
 
     pub fn encode_jwt(&self) -> Result<String, jsonwebtoken::errors::Error> {
         let header = Header::new(Algorithm::PS256);
-        let key = EncodingKey::from_rsa_pem(crate::CRYPTO.user_auth_key.private.as_slice())
+        let key = EncodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.private.as_slice())
             .expect("user_auth private key isn't valid. Unable to encode JWT.");
 
         Ok(encode(&header, &self, &key)?)
@@ -73,7 +72,7 @@ pub fn extract_claims(cookies: &CookieJar) -> Result<UserRoleToken, Problem> {
 
     match decode::<UserRoleToken>(
         &token,
-        &DecodingKey::from_rsa_pem(crate::CRYPTO.user_auth_key.public.borrow())
+        &DecodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.public.borrow())
             .expect("user_auth public key isn't valid. Unable to decode JWT."),
         &Validation::new(Algorithm::PS256),
     )
@@ -106,6 +105,28 @@ impl<'r> FromRequest<'r> for UserRoleToken {
     }
 }
 
+pub mod doc {
+    use utoipa::openapi::security::*;
+
+    #[derive(Clone, Copy)]
+    pub struct JWTAuth;
+
+    impl Into<SecurityScheme> for JWTAuth {
+        fn into(self) -> SecurityScheme {
+            let mut http = Http::new(HttpAuthScheme::Bearer);
+            http.bearer_format = Some("JWT".to_string());
+            SecurityScheme::Http(http)
+        }
+    }
+
+    impl utoipa::Modify for JWTAuth {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            let c = openapi.components.as_mut().unwrap();
+            c.add_security_scheme("jwt", *self)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,7 +150,7 @@ mod tests {
 
         let decoded: UserRoleToken = match decode(
             &token,
-            &DecodingKey::from_rsa_pem(crate::CRYPTO.user_auth_key.public.borrow())
+            &DecodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.public.borrow())
                 .expect("user_auth public key isn't valid. Unable to encode JWT."),
             &Validation::new(Algorithm::PS256),
         )
@@ -151,7 +172,15 @@ pub trait HasAuthCookie {
 }
 
 #[cfg(test)]
-impl HasAuthCookie for LocalResponse<'_> {
+impl HasAuthCookie for rocket::local::asynchronous::LocalResponse<'_> {
+    fn get_auth_cookie(&self) -> Option<UserRoleToken> {
+        tracing::trace!("extracting user roles token from request cookies");
+        extract_claims(self.cookies()).ok()
+    }
+}
+
+#[cfg(test)]
+impl HasAuthCookie for rocket::local::blocking::LocalResponse<'_> {
     fn get_auth_cookie(&self) -> Option<UserRoleToken> {
         tracing::trace!("extracting user roles token from request cookies");
         extract_claims(self.cookies()).ok()

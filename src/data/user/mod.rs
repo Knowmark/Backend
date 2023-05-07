@@ -5,10 +5,10 @@ use crypto::bcrypt::bcrypt;
 use rocket::http::{ContentType, Status};
 use rocket::response::Responder;
 use rocket::{response, Request, Response};
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 pub mod db;
@@ -17,7 +17,6 @@ pub mod profile;
 use crate::role::Role;
 
 use self::db::UserSignupData;
-
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct PasswordHash([u8; 24]);
@@ -102,14 +101,45 @@ impl User {
             user_role: Role::Normal,
         }
     }
+}
 
-    pub fn response_json(&self) -> String {
-        json!({
-            "id": self.id.clone(),
-            "username": self.username.clone(),
-            "user_role": self.user_role,
-        })
-        .to_string()
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UserResponse {
+    /// User UUID
+    pub id: Uuid,
+    /// User email
+    pub email: String,
+    /// User username
+    pub username: String,
+    /// User role
+    pub user_role: Role,
+}
+
+impl UserResponse {
+    pub fn json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+}
+
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        UserResponse {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            user_role: user.user_role,
+        }
+    }
+}
+
+impl<'r> Responder<'r, 'static> for UserResponse {
+    fn respond_to(self, _: &Request) -> response::Result<'static> {
+        let body: String = self.json().expect("unable to serialize UserResponse");
+
+        Response::build()
+            .header(ContentType::JSON)
+            .sized_body(body.len(), Cursor::new(body))
+            .ok()
     }
 }
 
@@ -120,17 +150,6 @@ impl From<UserSignupData<'_>> for User {
             signup_data.username,
             signup_data.password,
         )
-    }
-}
-
-impl<'r> Responder<'r, 'static> for User {
-    fn respond_to(self, _: &Request) -> response::Result<'static> {
-        let body: String = self.response_json();
-
-        Response::build()
-            .header(ContentType::JSON)
-            .sized_body(body.len(), Cursor::new(body))
-            .ok()
     }
 }
 

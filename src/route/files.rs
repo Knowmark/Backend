@@ -1,31 +1,30 @@
+use crate::config::Config;
+use rocket::{fs::NamedFile, State};
+
 use std::path::PathBuf;
 
-use rocket::State;
-
-use crate::config::Config;
-use rocket::fs::NamedFile;
-
-pub async fn app_index_file(c: &State<Config>) -> NamedFile {
+pub async fn app_index_file(c: &State<Config>) -> Option<NamedFile> {
     NamedFile::open(c.public_content.as_path().join("index.html"))
         .await
-        .expect(
-            format!(
-                "'{}' does not exist!",
-                c.public_content.as_path().join("index.html").display()
-            )
-            .as_str(),
-        )
+        .ok()
 }
 
+/// Serves client root page
+#[utoipa::path]
 #[get("/")]
-pub async fn app(c: &State<Config>) -> NamedFile {
+pub async fn app(c: &State<Config>) -> Option<NamedFile> {
     app_index_file(c).await
 }
 
+/// Serves client/public content
+#[utoipa::path(
+    params(
+        ("path", description = "content path")
+    )
+)]
 #[get("/<path..>", rank = 10)]
-pub async fn app_path(path: PathBuf, c: &State<Config>) -> NamedFile {
+pub async fn app_path(path: PathBuf, c: &State<Config>) -> Option<NamedFile> {
     NamedFile::open(c.public_content.as_path().join(path.as_path()))
         .await
         .ok()
-        .unwrap_or(app_index_file(c).await)
 }

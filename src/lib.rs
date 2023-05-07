@@ -71,6 +71,7 @@ pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, B
         }
     };
 
+    tracing::info!("Initializing cryptography information...");
     let _ = CRYPTO.deref();
 
     tracing::info!("Connecting to MongoDB: {}", c.mongodb_uri);

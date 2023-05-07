@@ -13,7 +13,9 @@ use uuid::Uuid;
 // pub static PART_COLLECTION_NAME: &'static str = "parts";
 // pub static PARTICIPANT_COLLECTION_NAME: &'static str = "participants";
 
-#[get("/")]
+/// List all quiz documents
+#[utoipa::path]
+#[get("/quiz")]
 #[tracing::instrument]
 pub async fn quiz_list(db: &State<Database>) -> Result<Json<Vec<Quiz>>, Problem> {
     let mut documents = db
@@ -37,7 +39,9 @@ pub async fn quiz_list(db: &State<Database>) -> Result<Json<Vec<Quiz>>, Problem>
     Ok(Json(quizzes))
 }
 
-#[post("/", format = "application/json", data = "<quiz>")]
+/// Crate a quiz
+#[utoipa::path(request_body = Quiz)]
+#[post("/quiz", format = "application/json", data = "<quiz>")]
 #[tracing::instrument]
 pub async fn quiz_create(
     quiz: Json<Quiz>,
@@ -69,7 +73,18 @@ pub fn quiz_id_filter(id: Uuid) -> Document {
     }
 }
 
-#[post("/<id>")]
+/// Get quiz information
+#[utoipa::path(
+    params(
+        ("id", description = "quiz ID")
+    ),
+    responses(
+        (status = 401, description = "Missing/expired token or insufficient privileges", body = Problem),
+        (status = 200, description = "Information about the quiz", body = UserResponse),
+        (status = 404, description = "Querried quiz doesn't exist"),
+    )
+)]
+#[get("/quiz/<id>")]
 #[tracing::instrument]
 pub async fn quiz_info(id: Uuid, db: &State<Database>) -> Result<Option<Json<Quiz>>, Problem> {
     let quiz_document = db
@@ -86,7 +101,21 @@ pub async fn quiz_info(id: Uuid, db: &State<Database>) -> Result<Option<Json<Qui
     Ok(quiz.map(|u| Json(u)))
 }
 
-#[delete("/<id>")]
+/// Delete a quiz
+#[utoipa::path(
+    params(
+        ("id", description = "quiz ID")
+    ),
+    responses(
+        (status = 401, description = "Missing/expired token", body = Problem),
+        (status = 200, description = "Information about existing user", body = UserResponse),
+        (status = 404, description = "Querried user doesn't exist"),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+#[delete("/quiz/<id>")]
 #[tracing::instrument]
 pub async fn quiz_delete(
     id: Uuid,

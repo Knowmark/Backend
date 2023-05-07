@@ -1,9 +1,8 @@
 use rsa::pkcs1::{EncodeRsaPrivateKey, LineEnding};
-use rsa::pkcs8::{EncodePublicKey};
+use rsa::pkcs8::EncodePublicKey;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::{env, fs};
-use rsa::pkcs1::der::Document;
 
 const PASSWORD_SALT: &'static str = "password.salt";
 const USER_AUTH_PUBLIC: &'static str = "user_auth.pem.pub";
@@ -20,7 +19,7 @@ pub struct KeySet {
 #[derive(Debug, Clone)]
 pub struct Crypto {
     pub salt: Salt,
-    pub user_auth_key: KeySet,
+    pub jwt_key: KeySet,
 }
 
 #[inline]
@@ -59,6 +58,7 @@ impl Crypto {
 
         let mut private = fs::read(dir.join(USER_AUTH_PRIVATE)).unwrap_or(vec![]);
 
+        // TODO: Keygen feature
         if public.len() == 0 || private.len() == 0 {
             tracing::info!("Private and/or public user auth key(s) empty. Generating a new pair.");
 
@@ -83,7 +83,7 @@ impl Crypto {
                 .to_public_key()
                 .to_public_key_der()
                 .expect("unable to generate PS256 public key")
-                .to_pem(LineEnding::LF)
+                .to_pem("JWT public key", LineEnding::LF)
                 .expect("unable to crate a valid UTF8 pem key")
                 .as_bytes()
                 .to_vec();
@@ -98,7 +98,7 @@ impl Crypto {
 
         Crypto {
             salt: salt.unwrap(),
-            user_auth_key: KeySet { public, private },
+            jwt_key: KeySet { public, private },
         }
     }
 }

@@ -7,8 +7,93 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/<executable file>",
+            "name": "Debug unit tests in library 'knowmark_backend'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=knowmark_backend"
+                ],
+                "filter": {
+                    "name": "knowmark_backend",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'knowmark-server'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=knowmark-server",
+                    "--package=knowmark_backend"
+                ],
+                "filter": {
+                    "name": "knowmark-server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'knowmark-server'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=knowmark-server",
+                    "--package=knowmark_backend"
+                ],
+                "filter": {
+                    "name": "knowmark-server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'knowmark-win-service'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=knowmark-win-service",
+                    "--package=knowmark_backend"
+                ],
+                "filter": {
+                    "name": "knowmark-win-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'knowmark-win-service'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=knowmark-win-service",
+                    "--package=knowmark_backend"
+                ],
+                "filter": {
+                    "name": "knowmark-win-service",
+                    "kind": "bin"
+                }
+            },
             "args": [],
             "cwd": "${workspaceFolder}"
         }

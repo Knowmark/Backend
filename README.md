@@ -7,81 +7,39 @@ quizzes and users (i.e. students) to solve them. Server then automatically valid
 possible (based on several different validation methods), allows quiz author to manually grade ungraded answers, modify
 grades on incorrectly graded answers, and finally send out grading results in bulk and generate a report.
 
-## Setup
+## Building
 
-Requires a running MongoDB instance. Development is based off of 6.0.5 version.
+To build the server, clone the repo and run [cargo](https://doc.rust-lang.org/cargo/):
 
-
-## Routes️
-
-Planned routes will likely change in functionality as they're being developed.
-
-Responses of most of the specified rotes are dependant on information (e.g. headers) provided by requests.
-
-### General
-
-| Method |  Route  | Status | Description |
-| :----: | :------ | :----: | :---------- |
-| GET    | `/api`  | [🚀](#status-map) | Serves API documentation for frontend |
-
-### User management routes
-
-| Method |       Route      | Status | Description |
-| :----: | :--------------- | :----: | :---------- |
-| GET    | `/login`         | [💡](#status-map) | Login form frontend |
-| POST   | `/login`         | [🚀](#status-map) | Login form submission |
-| GET    | `/user`          | [💡](#status-map) | Paged list of users |
-| POST   | `/user`          | [🚀](#status-map)️️ | Create a user from [submitted form](#user-create-form) |
-| GET    | `/user/<id>`     | [🚀](#status-map)️️ | Query information about user with `<id>` |
-| DELETE | `/user/<id>`     | [🚀️](#status-map)️ | Delete user with `<id>` |
-
-### Quiz management routes
-
-| Method |          Route          | Status | Description |
-| :----: | :---------------------- | :----: | :---------- |
-| GET    | `/quiz`                 | [💡](#status-map) | Paged list of quizzes |
-| POST   | `/quiz`                 | [🚀](#status-map) | Create a Quiz from JSON data. |
-| GET    | `/quiz/<id>`            | [🚀](#status-map) | Information about quiz with `<id>` |
-| POST   | `/quiz/<id>`            | [💡](#status-map) | Submit status updates for quiz with `<id>` |
-| DELETE | `/quiz/<id>`            | [🚀](#status-map) | Delete quiz with `<id>` |
-| GET    | `/quiz/<id>/<question>` | [💡](#status-map) | Frontend & information about `<question>` for quiz with `<id>` |
-| POST   | `/quiz/<id>/<question>` | [💡](#status-map) | Solution submission for `<question>` for quiz with `<id>` |
-| DELETE | `/quiz/<id>/<question>` | [💡](#status-map) | Remove `<question>` from quiz with `<id>` |
-
-### Status map
-
-| Icon | Meaning |
-| :--: | :------ |
-| ✅ | Fully implemented |
-| 🖥 | Backend implemented<br>Frontend in development |
-| 🚀️ | Backend implemented |
-| 🧩 | All pieces are in place |
-| 💡 | Planned |
-
-## Forms
-
-### User create form
-
-Form submitted by the client to server which provides server with information required to create a user account.
-Password is transmitted in cleartext and relies on [TLS](https://en.wikipedia.org/wiki/Transport_Layer_Security) to
-protect end-users from [MITM attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack).
-Passwords are hashed using [bcrypt](https://en.wikipedia.org/wiki/Bcrypt) with 15 cycles. Only password hashes are stored.
-
-#### Validation
-
-- Email must contain `@`
-- Username must match regex: `[\w\d_\-.]{5,32}`
-- Password must be of length in range: \[8, 50]
-    - Max. length restriction will be increased once pre-hashing is implemented.
-
-#### Example
-
-```json
-{
-  "username": "PineappleMan",
-  "password": "IlikeP1neapples!"
-}
+```sh
+cargo build --release --bin knowmark-server
 ```
+
+The resulting binary will be located in: `./target/<your-arch-quad>/release/knowmark-server`
+
+NOTE: Crosscompilation from Linux to Windows with gnu target works fine, msvc wasn't tested.
+
+## Initial Setup
+
+Requires a running MongoDB instance.
+
+> [MongoDB Docs: Installation](https://www.mongodb.com/docs/manual/administration/install-community/)
+
+By default, a localhost instance will be used, this can be changed through [configuration file](./docs/Running.md#configuration-file) or [environment variables](./docs/Running.md#environment-variables)
+
+## Functionality
+
+Endpoints will likely change as the application is being developed.
+
+For a quick listing of the routes, please refer to:
+
+- [API Endpoints - v1](./docs/Endpoints.md)
+
+Security features are documented in [docs/Security.md](./docs/Security.md).
+
+## Testing
+
+Long term goal is to have all backend routes unit tested.
 
 ## License
 

@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::config::Config;
 use crate::data::user::db::problem as user_problem;
-use crate::data::user::db::{CreateUserDbExt, UserCreatedResponse, UserLoginData, UserSignupData};
-use crate::data::user::{PasswordHash, User};
+use crate::data::user::db::{CreateUserDbExt, UserLoginData, UserSignupData};
+use crate::data::user::{PasswordHash, UserResponse};
 use crate::resp::jwt::{UserRoleToken, AUTH_COOKIE_NAME};
 use crate::resp::problem::Problem;
 use crate::role::Role;
@@ -42,13 +42,27 @@ pub async fn user_list(db: &State<Database>) -> Result<Vec<User>, Problem> {
 }
 */
 
-#[get("/<id>")]
+/// Get information about the user
+#[utoipa::path(
+    params(
+        ("id", description = "user ID")
+    ),
+    responses(
+        (status = 401, description = "Missing/expired token", body = Problem),
+        (status = 200, description = "Information about existing user", body = UserResponse),
+        (status = 404, description = "Querried user doesn't exist"),
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+#[get("/user/<id>")]
 #[tracing::instrument]
 pub async fn user_get(
     id: Uuid,
     auth: UserRoleToken,
     db: &State<Database>,
-) -> Result<Option<User>, Problem> {
+) -> Result<Option<UserResponse>, Problem> {
     if auth.role < Role::Normal {
         return Err(Problem::new_untyped(
             Status::Unauthorized,
@@ -56,17 +70,25 @@ pub async fn user_get(
         ));
     }
 
-    db.get_user(id).await
+    db.get_user(id).await.map(|ok| ok.map(UserResponse::from))
 }
 
-#[post("/", data = "<create_user>")]
+/// Create a user
+#[utoipa::path(
+    request_body(content = UserSignupData<'_>, content_type="application/x-www-form-urlencoded"),
+    responses(
+        (status = 401, description = "Missing/expired token", body = Problem),
+        (status = 200, description = "User created", body = UserResponse)
+    )
+)]
+#[post("/user", data = "<create_user>")]
 #[tracing::instrument]
 pub async fn user_create<'a>(
     create_user: Form<UserSignupData<'_>>,
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
     c: &State<Config>,
-) -> Result<Json<UserCreatedResponse>, Problem> {
+) -> Result<Json<UserResponse>, Problem> {
     create_user.validate()?;
 
     let (token, user) = db
@@ -74,16 +96,24 @@ pub async fn user_create<'a>(
         .await?;
     cookies.add(token.cookie()?);
 
-    Ok(Json(UserCreatedResponse::from(user)))
+    Ok(Json(UserResponse::from(user)))
 }
 
-#[post("/", data = "<login_user>")]
+/// Login via a login form
+#[utoipa::path(
+    request_body(content = UserLoginData, content_type="application/x-www-form-urlencoded"),
+    responses(
+        (status = 401, description = "Bad login infomation", body = Problem),
+        (status = 200, description = "Login user info and cookies", body = UserResponse)
+    )
+)]
+#[post("/login", data = "<login_user>")]
 #[tracing::instrument]
 pub async fn login_submit<'a>(
     login_user: Form<UserLoginData>,
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
-) -> Result<User, Problem> {
+) -> Result<UserResponse, Problem> {
     let is_email = login_user.is_email();
 
     login_user.validate(is_email)?;
@@ -91,11 +121,8 @@ pub async fn login_submit<'a>(
     // VULN: Prevent login_submit brute force attacks by checking login source
 
     let document = match is_email {
-        true => db.find_user_by_email(login_user.identifier.clone()).await,
-        false => {
-            db.find_user_by_username(login_user.identifier.clone())
-                .await
-        }
+        true => db.find_user_by_email(login_user.username.clone()).await,
+        false => db.find_user_by_username(login_user.username.clone()).await,
     }?;
 
     let user = document.ok_or_else(|| user_problem::bad_login(is_email))?;
@@ -107,10 +134,23 @@ pub async fn login_submit<'a>(
     let urt = UserRoleToken::new(&user);
     cookies.add(urt.cookie()?);
 
-    Ok(user)
+    Ok(UserResponse::from(user))
 }
 
-#[delete("/<id>")]
+/// Delete a user
+#[utoipa::path(
+    params(
+        ("id", description = "ID of user to delete")
+    ),
+    responses(
+        (status = 401, description = "Insufficient privileges to delete user", body = Problem),
+        (status = 200, description = "ID of deleted user", body = Uuid)
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
+#[delete("/user/<id>")]
 #[tracing::instrument]
 pub async fn user_delete<'a>(
     id: Uuid,
@@ -146,20 +186,21 @@ mod user_endpoints {
     use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
     use crate::{
-        data::user::{db::CreateUserDbExt, User},
+        data::user::{
+            db::{CreateUserDbExt, UserSignupData},
+            User, UserResponse,
+        },
         resp::jwt::{HasAuthCookie, UserRoleToken},
         role::Role,
-        route::users::UserCreatedResponse,
     };
     use mongodb::Database;
     use rocket::{
         http::{ContentType, Header, Status},
-        local::asynchronous::Client, Rocket,
+        local::asynchronous::Client,
+        Rocket,
     };
     use tracing::Level;
     use uuid::Uuid;
-
-    use super::UserSignupData;
 
     fn example_signup_data(user: impl AsRef<str>) -> UserSignupData<'static> {
         UserSignupData {
@@ -189,7 +230,9 @@ mod user_endpoints {
     }
 
     async fn test_backend() -> Rocket<rocket::Build> {
-        crate::create(Some(Level::TRACE)).await.expect("unable to build test backend")
+        crate::create(Some(Level::TRACE))
+            .await
+            .expect("unable to build test backend")
     }
 
     #[rocket::async_test]
@@ -221,7 +264,7 @@ mod user_endpoints {
         );
         tracing::info!("{:#?}", &response);
 
-        let response_data: UserCreatedResponse =
+        let response_data: UserResponse =
             response.into_json().await.expect("invalid response json");
 
         db.delete_user(response_data.id)
@@ -261,7 +304,7 @@ mod user_endpoints {
             "jwt_auth cookie wasn't present"
         );
 
-        let response_data: UserCreatedResponse =
+        let response_data: UserResponse =
             response.into_json().await.expect("invalid response json");
 
         db.delete_user(response_data.id)

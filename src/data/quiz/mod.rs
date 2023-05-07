@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::{collections::HashMap, time::Duration};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 pub static PART_COLLECTION_NAME: &str = "quiz.parts";
@@ -10,7 +11,7 @@ fn true_bool() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub enum AnswerType {
     Bool,
     Number,
@@ -30,7 +31,7 @@ pub enum AnswerType {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub enum AnswerValidation {
     Bool {
         expected: bool,
@@ -61,7 +62,7 @@ pub enum AnswerValidation {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub enum Part {
     Content {
         #[serde(default = "Uuid::new_v4")]
@@ -84,7 +85,7 @@ pub enum Part {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "t", content = "value")]
 pub enum AnswerChoice {
     Bool(bool),
@@ -96,7 +97,7 @@ pub enum AnswerChoice {
     Multiple(Vec<u8>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ParticipantInfo {
     pub id: Uuid,
     #[serde(default = "Utc::now")]
@@ -105,7 +106,7 @@ pub struct ParticipantInfo {
     pub choices: HashMap<Uuid, AnswerChoice>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Quiz {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
