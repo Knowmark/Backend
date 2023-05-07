@@ -15,9 +15,10 @@ path = "src/bin/service.rs"
 required-features = ["windows-service"]
 
 [features]
-default = []
+default = ["generate-security"]
 tls = ["rocket/tls"]
 validation-regex = ["regex"]
+generate-security = ["rsa"]
 
 [dependencies]
 # Windows only
@@ -44,7 +45,7 @@ mongodb = { version = "2.3", features = ["zstd-compression"] }
 bson = { version = "2.4", features = ["uuid-1"] }
 
 # Crypto
-rsa = "0.9.1"
+rsa = { version = "0.9.1", optional = true }
 sha2 = "0.10.6"
 jsonwebtoken = "8.3.0"
 
@@ -59,7 +60,6 @@ uuid = { version = "1.1", features = ["serde", "v4", "v5"] }
 rand = "0.8"
 regex = { version = "1.5", optional = true }
 dotenv = "0.15"
-lazy_static = "1.4"
 
 # Logging
 tracing = "0.1"

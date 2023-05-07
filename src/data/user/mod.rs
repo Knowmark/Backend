@@ -16,24 +16,17 @@ pub mod profile;
 
 use crate::role::Role;
 
-use self::db::UserSignupData;
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct PasswordHash([u8; 24]);
 
 impl PasswordHash {
-    pub fn new(password: impl AsRef<str>) -> PasswordHash {
+    pub fn new(password: impl AsRef<str>, salt: impl AsRef<[u8]>) -> PasswordHash {
         let mut pw_hash: [u8; 24] = [0; 24];
 
         let mut sha = Sha256::new();
         sha2::Digest::update(&mut sha, password.as_ref().as_bytes());
 
-        bcrypt(
-            15,
-            &crate::CRYPTO.salt,
-            sha.finalize().as_slice(),
-            &mut pw_hash,
-        );
+        bcrypt(15, salt.as_ref(), sha.finalize().as_slice(), &mut pw_hash);
 
         PasswordHash(pw_hash)
     }
@@ -84,8 +77,9 @@ impl User {
         email: impl AsRef<str>,
         username: impl AsRef<str>,
         password: impl AsRef<str>,
+        salt: impl AsRef<[u8]>,
     ) -> User {
-        let pw_hash = PasswordHash::new(password);
+        let pw_hash = PasswordHash::new(password, salt);
 
         let id = Uuid::new_v5(
             &Uuid::NAMESPACE_OID,
@@ -140,16 +134,6 @@ impl<'r> Responder<'r, 'static> for UserResponse {
             .header(ContentType::JSON)
             .sized_body(body.len(), Cursor::new(body))
             .ok()
-    }
-}
-
-impl From<UserSignupData<'_>> for User {
-    fn from(signup_data: UserSignupData<'_>) -> Self {
-        User::new(
-            signup_data.email,
-            signup_data.username,
-            signup_data.password,
-        )
     }
 }
 

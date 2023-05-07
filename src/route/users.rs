@@ -7,13 +7,14 @@ use rocket::serde::json::Json;
 use rocket::State;
 use uuid::Uuid;
 
-use crate::settings::Settings;
 use crate::data::user::db::problem as user_problem;
 use crate::data::user::db::{CreateUserDbExt, UserLoginData, UserSignupData};
 use crate::data::user::{PasswordHash, UserResponse};
 use crate::resp::jwt::{UserRoleToken, AUTH_COOKIE_NAME};
 use crate::resp::problem::Problem;
 use crate::role::Role;
+use crate::security::Security;
+use crate::settings::Settings;
 
 /* TODO: Support paging
 // Responder isn't implemented for Vec.
@@ -88,13 +89,14 @@ pub async fn user_create<'a>(
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
     c: &State<Settings>,
+    security: &State<Security>,
 ) -> Result<Json<UserResponse>, Problem> {
     create_user.validate()?;
 
     let (token, user) = db
-        .create_user(create_user.into_inner(), &c.admin_usernames)
+        .create_user(create_user.into_inner(), &security.salt, &c.admin_usernames)
         .await?;
-    cookies.add(token.cookie()?);
+    cookies.add(token.cookie(&security.jwt_keys.private)?);
 
     Ok(Json(UserResponse::from(user)))
 }
@@ -113,6 +115,7 @@ pub async fn login_submit<'a>(
     login_user: Form<UserLoginData>,
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
+    security: &State<Security>,
 ) -> Result<UserResponse, Problem> {
     let is_email = login_user.is_email();
 
@@ -127,12 +130,12 @@ pub async fn login_submit<'a>(
 
     let user = document.ok_or_else(|| user_problem::bad_login(is_email))?;
 
-    if user.pw_hash != PasswordHash::new(login_user.password.clone()) {
+    if user.pw_hash != PasswordHash::new(login_user.password.clone(), security.salt) {
         return Err(user_problem::bad_login(is_email));
     }
 
     let urt = UserRoleToken::new(&user);
-    cookies.add(urt.cookie()?);
+    cookies.add(urt.cookie(&security.jwt_keys.private)?);
 
     Ok(UserResponse::from(user))
 }
@@ -192,6 +195,7 @@ mod user_endpoints {
         },
         resp::jwt::{HasAuthCookie, UserRoleToken},
         role::Role,
+        security::{self, Security},
     };
     use mongodb::Database;
     use rocket::{
@@ -241,6 +245,7 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let response: rocket::local::asynchronous::LocalResponse = client
             .post("/api/v1/user")
@@ -259,7 +264,9 @@ mod user_endpoints {
             "not a application/json response"
         );
         assert!(
-            response.get_auth_cookie().is_some(),
+            response
+                .get_auth_cookie(&security.jwt_keys.public)
+                .is_some(),
             "jwt_auth cookie wasn't present"
         );
         tracing::info!("{:#?}", &response);
@@ -278,9 +285,10 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let user: UserSignupData = example_signup_data("v1_user_create_can_login");
-        db.create_user(user.clone(), &[])
+        db.create_user(user.clone(), &security.salt, &[])
             .await
             .expect("unable to create test user");
 
@@ -300,7 +308,9 @@ mod user_endpoints {
             "not a application/json response"
         );
         assert!(
-            response.get_auth_cookie().is_some(),
+            response
+                .get_auth_cookie(&security.jwt_keys.public)
+                .is_some(),
             "jwt_auth cookie wasn't present"
         );
 
@@ -318,9 +328,10 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let user = example_signup_data("v1_login_submit_works");
-        db.create_user(user.clone(), &[])
+        db.create_user(user.clone(), &security.salt, &[])
             .await
             .expect("unable to create test user");
 
@@ -340,7 +351,9 @@ mod user_endpoints {
             "not a application/json response"
         );
         assert!(
-            response.get_auth_cookie().is_some(),
+            response
+                .get_auth_cookie(&security.jwt_keys.public)
+                .is_some(),
             "no jwt_auth cookie present"
         );
 
@@ -363,9 +376,10 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let user = example_signup_data("v1_user_delete_doesnt_work_for_unauthorized_users");
-        db.create_user(user.clone(), &[])
+        db.create_user(user.clone(), &security.salt, &[])
             .await
             .expect("unable to create user");
 
@@ -389,15 +403,18 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let user = example_signup_data("v1_user_delete_works_for_same_user");
-        db.create_user(user.clone(), &[])
+        db.create_user(user.clone(), &security.salt, &[])
             .await
             .expect("unable to create user");
 
-        let urt = UserRoleToken::new(&User::from(user.clone()));
+        let urt = UserRoleToken::new(&user.to_user(&security.salt));
         assert_eq!(urt.user, user.id());
-        let jwt_cookie = urt.cookie().expect("unable to encode UserRoleToken cookie");
+        let jwt_cookie = urt
+            .cookie(&security.jwt_keys.private)
+            .expect("unable to encode UserRoleToken cookie");
         let delete_uri = format!("/api/v1/user/{}", user.id());
 
         let response = client
@@ -423,17 +440,18 @@ mod user_endpoints {
             .await
             .expect("invalid backend");
         let db: &Database = client.rocket().state().unwrap();
+        let security: &Security = client.rocket().state().unwrap();
 
         let user = example_signup_data("v1_user_delete_works_for_admin_user");
-        db.create_user(user.clone(), &[])
+        db.create_user(user.clone(), &security.salt, &[])
             .await
             .expect("unable to create user");
 
-        let mut admin = User::new("admin@example.com", "admin", "admin_pass");
+        let mut admin = User::new("admin@example.com", "admin", "admin_pass", &security.salt);
         admin.user_role = Role::Admin;
         let urt = UserRoleToken::new(&admin);
         let jwt_cookie = urt
-            .cookie()
+            .cookie(&security.jwt_keys.private)
             .expect("unable to encode admin UserRoleToken cookie");
         let delete_uri = format!("/api/v1/user/{}", user.id());
 

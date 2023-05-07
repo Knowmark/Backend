@@ -9,8 +9,8 @@ use super::util::date_time_as_unix_seconds;
 use crate::data::user::User;
 use crate::resp::problem::Problem;
 use crate::role::Role;
+use crate::security::Security;
 use rocket::outcome::Outcome::{Failure, Success};
-use std::borrow::Borrow;
 use uuid::Uuid;
 
 pub static AUTH_COOKIE_NAME: &'static str = "jwt_auth";
@@ -36,21 +36,29 @@ impl UserRoleToken {
         }
     }
 
-    pub fn encode_jwt(&self) -> Result<String, jsonwebtoken::errors::Error> {
+    pub fn encode_jwt(
+        &self,
+        private_key: impl AsRef<[u8]>,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         let header = Header::new(Algorithm::PS256);
-        let key = EncodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.private.as_slice())
+        let key = EncodingKey::from_rsa_pem(private_key.as_ref())
             .expect("user_auth private key isn't valid. Unable to encode JWT.");
 
         Ok(encode(&header, &self, &key)?)
     }
 
-    pub fn cookie(&self) -> Result<Cookie<'static>, jsonwebtoken::errors::Error> {
-        Ok(Cookie::build(AUTH_COOKIE_NAME, self.encode_jwt()?)
-            .secure(true)
-            .expires(OffsetDateTime::from_unix_timestamp(self.exp.timestamp()).ok())
-            .path("/")
-            .http_only(true)
-            .finish())
+    pub fn cookie(
+        &self,
+        private_key: impl AsRef<[u8]>,
+    ) -> Result<Cookie<'static>, jsonwebtoken::errors::Error> {
+        Ok(
+            Cookie::build(AUTH_COOKIE_NAME, self.encode_jwt(private_key)?)
+                .secure(true)
+                .expires(OffsetDateTime::from_unix_timestamp(self.exp.timestamp()).ok())
+                .path("/")
+                .http_only(true)
+                .finish(),
+        )
     }
 }
 
@@ -60,7 +68,10 @@ pub fn auth_problem(detail: impl ToString) -> Problem {
         .clone()
 }
 
-pub fn extract_claims(cookies: &CookieJar) -> Result<UserRoleToken, Problem> {
+pub fn extract_claims(
+    cookies: &CookieJar,
+    public_key: impl AsRef<[u8]>,
+) -> Result<UserRoleToken, Problem> {
     let auth_cookie = cookies.get(AUTH_COOKIE_NAME);
     let token = match auth_cookie {
         Some(jwt) => jwt.value().to_owned(),
@@ -72,7 +83,7 @@ pub fn extract_claims(cookies: &CookieJar) -> Result<UserRoleToken, Problem> {
 
     match decode::<UserRoleToken>(
         &token,
-        &DecodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.public.borrow())
+        &DecodingKey::from_rsa_pem(public_key.as_ref())
             .expect("user_auth public key isn't valid. Unable to decode JWT."),
         &Validation::new(Algorithm::PS256),
     )
@@ -92,8 +103,10 @@ impl<'r> FromRequest<'r> for UserRoleToken {
     type Error = Problem;
 
     async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let security: &Security = req.rocket().state().unwrap();
+
         tracing::trace!("extracting user roles token from request cookies");
-        let claims: UserRoleToken = match extract_claims(req.cookies()) {
+        let claims: UserRoleToken = match extract_claims(req.cookies(), &security.jwt_keys.public) {
             Ok(it) => it,
             Err(e) => {
                 tracing::debug!("unable to extract claims from cookies");
@@ -146,11 +159,15 @@ mod tests {
             role: Role::Admin,
         };
 
-        let token = urt.encode_jwt().expect("encoding should work for example");
+        let security = Security::load();
+
+        let token = urt
+            .encode_jwt(&security.jwt_keys.private)
+            .expect("encoding should work for example");
 
         let decoded: UserRoleToken = match decode(
             &token,
-            &DecodingKey::from_rsa_pem(crate::CRYPTO.jwt_key.public.borrow())
+            &DecodingKey::from_rsa_pem(&security.jwt_keys.public)
                 .expect("user_auth public key isn't valid. Unable to encode JWT."),
             &Validation::new(Algorithm::PS256),
         )
@@ -168,21 +185,21 @@ mod tests {
 }
 
 pub trait HasAuthCookie {
-    fn get_auth_cookie(&self) -> Option<UserRoleToken>;
+    fn get_auth_cookie(&self, public_key: impl AsRef<[u8]>) -> Option<UserRoleToken>;
 }
 
 #[cfg(test)]
 impl HasAuthCookie for rocket::local::asynchronous::LocalResponse<'_> {
-    fn get_auth_cookie(&self) -> Option<UserRoleToken> {
+    fn get_auth_cookie(&self, public_key: impl AsRef<[u8]>) -> Option<UserRoleToken> {
         tracing::trace!("extracting user roles token from request cookies");
-        extract_claims(self.cookies()).ok()
+        extract_claims(self.cookies(), public_key).ok()
     }
 }
 
 #[cfg(test)]
 impl HasAuthCookie for rocket::local::blocking::LocalResponse<'_> {
-    fn get_auth_cookie(&self) -> Option<UserRoleToken> {
+    fn get_auth_cookie(&self, public_key: impl AsRef<[u8]>) -> Option<UserRoleToken> {
         tracing::trace!("extracting user roles token from request cookies");
-        extract_claims(self.cookies()).ok()
+        extract_claims(self.cookies(), public_key).ok()
     }
 }

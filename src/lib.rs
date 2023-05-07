@@ -7,10 +7,7 @@ extern crate tracing_futures;
 extern crate rocket;
 #[macro_use]
 extern crate serde;
-#[macro_use]
-extern crate lazy_static;
 
-use bson::doc;
 use error::BackendError;
 use mongodb::Client;
 use rocket::http::Method;
@@ -20,22 +17,18 @@ use std::process::exit;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use crate::resp::crypto::Crypto;
 use crate::route::mount_api;
+use crate::security::Security;
 use crate::settings::{Settings, CONFIG_FILE_NAME};
-use std::ops::Deref;
 
 pub mod data;
 pub mod error;
 pub mod resp;
 pub mod role;
 pub mod route;
+pub mod security;
 pub mod settings;
 pub mod util;
-
-lazy_static! {
-    pub static ref CRYPTO: Crypto = Crypto::init();
-}
 
 pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, BackendError> {
     if let Some(l) = log_level {
@@ -59,8 +52,8 @@ pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, B
         Settings::default()
     });
 
-    tracing::info!("Initializing cryptography information...");
-    let _ = CRYPTO.deref();
+    tracing::info!("Initializing security salts and keys...");
+    let security = Security::load();
 
     tracing::info!("Connecting to MongoDB: {}", settings.mongodb_uri);
     let db_client = Client::with_uri_str(settings.mongodb_uri.as_str())
@@ -76,7 +69,7 @@ pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, B
     }
 
     tracing::info!("Initializing Rocket...");
-    let mut r = rocket::build().manage(settings).manage(db);
+    let mut r = rocket::build().manage(settings).manage(db).manage(security);
 
     tracing::info!("Setting up CORS...");
     let allowed_origins = AllowedOrigins::All;

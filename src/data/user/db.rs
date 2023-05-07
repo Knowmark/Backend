@@ -79,6 +79,10 @@ impl<'r> UserSignupData<'r> {
                 .as_bytes(),
         )
     }
+
+    pub fn to_user(&self, salt: impl AsRef<[u8]>) -> User {
+        User::new(&self.email, &self.username, &self.password, salt)
+    }
 }
 
 impl std::fmt::Debug for UserSignupData<'_> {
@@ -162,6 +166,7 @@ pub trait CreateUserDbExt {
     async fn create_user<'a>(
         &self,
         create_user: UserSignupData<'_>,
+        salt: impl AsRef<[u8]>,
         admin_names: impl AsRef<[String]>,
     ) -> Result<(UserRoleToken, User), Problem>;
 
@@ -180,12 +185,13 @@ impl CreateUserDbExt for Database {
     async fn create_user<'a>(
         &self,
         create_user: UserSignupData<'_>,
+        salt: impl AsRef<[u8]>,
         admin_names: impl AsRef<[String]>,
     ) -> Result<(UserRoleToken, User), Problem> {
         let existing_email = self.find_user_by_email(&create_user.email).await?;
 
         if let Some(existing) = existing_email {
-            let create_hash = PasswordHash::new(create_user.password.as_ref());
+            let create_hash = PasswordHash::new(create_user.password.as_ref(), salt);
             return if existing.pw_hash == create_hash {
                 let urt = UserRoleToken::new(&existing);
                 Ok((urt, existing))
@@ -208,7 +214,7 @@ impl CreateUserDbExt for Database {
             ));
         }
 
-        let mut user = User::from(create_user);
+        let mut user = create_user.to_user(salt);
 
         if admin_names.as_ref().contains(&user.username) {
             user.user_role = Role::Admin;
