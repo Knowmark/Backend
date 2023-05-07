@@ -1,9 +1,9 @@
-use crate::config::Config;
+use crate::settings::Settings;
 use rocket::{fs::NamedFile, State};
 
 use std::path::PathBuf;
 
-pub async fn app_index_file(c: &State<Config>) -> Option<NamedFile> {
+pub async fn app_index_file(c: &State<Settings>) -> Option<NamedFile> {
     NamedFile::open(c.public_content.as_path().join("index.html"))
         .await
         .ok()
@@ -12,7 +12,7 @@ pub async fn app_index_file(c: &State<Config>) -> Option<NamedFile> {
 /// Serves client root page
 #[utoipa::path]
 #[get("/")]
-pub async fn app(c: &State<Config>) -> Option<NamedFile> {
+pub async fn app(c: &State<Settings>) -> Option<NamedFile> {
     app_index_file(c).await
 }
 
@@ -23,7 +23,7 @@ pub async fn app(c: &State<Config>) -> Option<NamedFile> {
     )
 )]
 #[get("/<path..>", rank = 10)]
-pub async fn app_path(path: PathBuf, c: &State<Config>) -> Option<NamedFile> {
+pub async fn app_path(path: PathBuf, c: &State<Settings>) -> Option<NamedFile> {
     NamedFile::open(c.public_content.as_path().join(path.as_path()))
         .await
         .ok()

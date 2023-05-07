@@ -7,7 +7,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::settings::Settings;
 use crate::data::user::db::problem as user_problem;
 use crate::data::user::db::{CreateUserDbExt, UserLoginData, UserSignupData};
 use crate::data::user::{PasswordHash, UserResponse};
@@ -87,7 +87,7 @@ pub async fn user_create<'a>(
     create_user: Form<UserSignupData<'_>>,
     cookies: &'a CookieJar<'_>,
     db: &State<Database>,
-    c: &State<Config>,
+    c: &State<Settings>,
 ) -> Result<Json<UserResponse>, Problem> {
     create_user.validate()?;
 

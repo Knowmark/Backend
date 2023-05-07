@@ -1,9 +1,6 @@
 use std::iter::repeat;
 use std::path::{Path, PathBuf};
 
-use base64::engine::GeneralPurpose;
-
-
 #[macro_export]
 macro_rules! test_file {
     ($path: expr, $file: literal) => {
@@ -21,11 +18,4 @@ pub fn find_first_subpath<P: AsRef<Path>, F: Fn(&Path) -> bool>(
         .zip(repeat(root.as_ref()))
         .map(|(b, a)| a.join(b))
         .find(|it: &PathBuf| search(&it))
-}
-
-pub fn base64_engine() -> GeneralPurpose {
-    base64::engine::GeneralPurpose::new(
-        &base64::alphabet::URL_SAFE,
-        base64::engine::GeneralPurposeConfig::new(),
-    )
 }

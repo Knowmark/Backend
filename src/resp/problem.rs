@@ -1,7 +1,6 @@
 use std::io::Cursor;
 use From;
 
-use base64::DecodeError;
 use rocket::http::hyper::header::CONTENT_LANGUAGE;
 use rocket::http::ContentType;
 use rocket::http::Status;
@@ -259,12 +258,6 @@ impl From<jsonwebtoken::errors::Error> for Problem {
             }
             _ => Problem::new_untyped(Status::Unauthorized, "Error while handling JWT."),
         }
-    }
-}
-
-impl From<DecodeError> for Problem {
-    fn from(_: DecodeError) -> Self {
-        Problem::new_untyped(Status::BadRequest, "Malformed base64 encoded string.")
     }
 }
 

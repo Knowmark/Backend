@@ -14,24 +14,23 @@ use bson::doc;
 use error::BackendError;
 use mongodb::Client;
 use rocket::http::Method;
-use rocket::Rocket;
+use rocket::{Config, Rocket};
 use rocket_cors::{AllowedHeaders, AllowedOrigins};
 use std::process::exit;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use crate::config::Config;
-use crate::error::ConfigurationError;
 use crate::resp::crypto::Crypto;
 use crate::route::mount_api;
+use crate::settings::{Settings, CONFIG_FILE_NAME};
 use std::ops::Deref;
 
-pub mod config;
 pub mod data;
 pub mod error;
 pub mod resp;
 pub mod role;
 pub mod route;
+pub mod settings;
 pub mod util;
 
 lazy_static! {
@@ -52,43 +51,32 @@ pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, B
         tracing::warn!("Unable to load .env file.");
     }
 
-    tracing::info!("Loading configuration...");
-    let c = match Config::load() {
-        Ok(c) => {
-            tracing::info!("Configuration loaded.");
-            c
-        }
-        Err(ConfigurationError::NotFound(_)) => {
-            let c = Config::default();
-            if c.save().is_err() {
-                tracing::warn!("Unable to save generated configuration.");
-            }
-            c
-        }
-        Err(other) => {
-            tracing::error!("Configuration error: {}", other);
-            return Err(other.into());
-        }
-    };
+    // override Rocket settings file name
+    std::env::set_var("ROCKET_CONFIG", CONFIG_FILE_NAME);
+
+    let settings = Config::figment().extract::<Settings>().unwrap_or_else(|_| {
+        tracing::warn!("Unable to extract Settings from Config figment");
+        Settings::default()
+    });
 
     tracing::info!("Initializing cryptography information...");
     let _ = CRYPTO.deref();
 
-    tracing::info!("Connecting to MongoDB: {}", c.mongodb_uri);
-    let client = Client::with_uri_str(c.mongodb_uri.as_str())
+    tracing::info!("Connecting to MongoDB: {}", settings.mongodb_uri);
+    let db_client = Client::with_uri_str(settings.mongodb_uri.as_str())
         .await
         .expect("Unable to init MongoDB client! Is URI valid?");
 
-    tracing::info!("Using MongoDB database: {}", c.mongodb_db);
-    let db = client.database(c.mongodb_db.as_str());
+    tracing::info!("Using MongoDB database: {}", settings.mongodb_db);
+    let db = db_client.database(settings.mongodb_db.as_str());
 
     if db.list_collections(None, None).await.is_err() {
         tracing::error!("Unable to connect to MongoDB.");
         exit(1)
     }
 
-    tracing::info!("Starting HTTP server...");
-    let mut r = rocket::build().manage(c).manage(db);
+    tracing::info!("Initializing Rocket...");
+    let mut r = rocket::build().manage(settings).manage(db);
 
     tracing::info!("Setting up CORS...");
     let allowed_origins = AllowedOrigins::All;

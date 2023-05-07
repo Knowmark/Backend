@@ -1,6 +1,6 @@
 ## Configuration file
 
-`settings.yml` file will be read from run directory (cwd).
+`Knowmark.toml` file will be read from run directory (cwd).
 
 The following options are supported:
 | Option | Default | Description |

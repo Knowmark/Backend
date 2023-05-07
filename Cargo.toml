@@ -17,6 +17,7 @@ required-features = ["windows-service"]
 [features]
 default = []
 tls = ["rocket/tls"]
+validation-regex = ["regex"]
 
 [dependencies]
 # Windows only
@@ -34,6 +35,7 @@ utoipa = { git = "https://github.com/juhaku/utoipa", rev = "cf53488", features =
     "uuid",
     "repr",
 ] }
+# bcrypt
 rust-crypto = "0.2"
 
 tokio = { version = "1", features = ["full"] }
@@ -42,26 +44,22 @@ mongodb = { version = "2.3", features = ["zstd-compression"] }
 bson = { version = "2.4", features = ["uuid-1"] }
 
 # Crypto
-rsa = "^0.9.1"
-sha2 = "^0.10.6"
-jsonwebtoken = "8.1"
+rsa = "0.9.1"
+sha2 = "0.10.6"
+jsonwebtoken = "8.3.0"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 serde_json = "1.0"
 
-base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.1", features = ["serde", "v4", "v5"] }
 
 # Functionality
 rand = "0.8"
-regex = "1.5"
+regex = { version = "1.5", optional = true }
 dotenv = "0.15"
 lazy_static = "1.4"
-derive_more = "0.99"
-async-trait = "0.1"
 
 # Logging
 tracing = "0.1"
@@ -72,7 +70,3 @@ tracing-futures = "0.2"
 # Error handling
 anyhow = "1.0"
 thiserror = "1.0"
-
-[dev-dependencies]
-wiremock = "0.5"
-lazy_static = "1.4"

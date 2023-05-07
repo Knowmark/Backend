@@ -1,6 +1,4 @@
-use derive_more::{Deref, DerefMut};
 use std::cmp::Ordering;
-
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BirthDate {
@@ -22,7 +20,7 @@ impl Ord for BirthDate {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Deref)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Tag(String);
 
 impl<S: ToString> From<S> for Tag {
@@ -31,7 +29,7 @@ impl<S: ToString> From<S> for Tag {
     }
 }
 
-#[derive(Debug, Clone, Hash, Deref, DerefMut)]
+#[derive(Debug, Clone, Hash)]
 pub struct Interests(Vec<Tag>);
 
 #[derive(Debug, Clone, Hash)]

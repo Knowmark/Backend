@@ -13,7 +13,7 @@ impl Default for PageState {
     }
 }
 
-#[async_trait]
+#[rocket::async_trait]
 impl<'r> FromRequest<'r> for PageState {
     type Error = Infallible;
 

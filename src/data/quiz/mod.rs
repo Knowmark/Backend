@@ -45,6 +45,7 @@ pub enum AnswerValidation {
         min: f64,
         max: f64,
     },
+    #[cfg(feature = "validation-regex")]
     Regex {
         #[serde(default)]
         case_sensitive: bool,
