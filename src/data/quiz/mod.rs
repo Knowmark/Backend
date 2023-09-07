@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 pub static PART_COLLECTION_NAME: &str = "quiz.parts";
-pub static PARTICIPANT_COLLECTION_NAME: &str = "participants";
+pub static PARTICIPANT_COLLECTION_NAME: &str = "participant";
 pub static QUIZ_COLLECTION_NAME: &str = "quiz";
 
 fn true_bool() -> bool {
@@ -12,7 +12,8 @@ fn true_bool() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub enum AnswerType {
+#[serde(tag = "t", content = "value")]
+pub enum AnswerKind {
     Bool,
     Number,
     Short,
@@ -64,7 +65,7 @@ pub enum AnswerValidation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub enum Part {
+pub enum QuizPart {
     Content {
         #[serde(default = "Uuid::new_v4")]
         id: Uuid,
@@ -75,13 +76,17 @@ pub enum Part {
         #[serde(default = "Uuid::new_v4")]
         id: Uuid,
         text: String,
-        ans: AnswerType,
+        kind: AnswerKind,
+        #[serde(default)]
         choices: Vec<AnswerChoice>,
 
         time_limit: Option<Duration>,
 
         value: f32,
+        /// Specifies a correct answer
         validation: Option<AnswerValidation>,
+        /// Allow partial answers
+        #[serde(default = "true_bool")]
         partial: bool,
     },
 }
@@ -89,7 +94,6 @@ pub enum Part {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "t", content = "value")]
 pub enum AnswerChoice {
-    Bool(bool),
     Number(f64),
     Short(String),
     Long(String),
@@ -99,9 +103,8 @@ pub enum AnswerChoice {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ParticipantInfo {
-    pub id: Uuid,
-    #[serde(default = "Utc::now")]
+pub struct QuizParticipant {
+    pub user_id: Uuid,
     pub started_on: DateTime<Utc>,
     #[serde(default)]
     pub choices: HashMap<Uuid, AnswerChoice>,
@@ -109,17 +112,23 @@ pub struct ParticipantInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Quiz {
-    #[serde(default = "Uuid::new_v4")]
+    #[serde(
+        default = "Uuid::new_v4",
+        rename = "_id",
+        with = "bson::serde_helpers::uuid_1_as_binary"
+    )]
     pub id: Uuid,
     pub name: String,
     #[serde(default)]
     pub desc: String,
-    #[serde(default = "Uuid::new_v4")] // TODO: Remove default
+    #[serde(
+        default = "Uuid::new_v4",
+        with = "bson::serde_helpers::uuid_1_as_binary"
+    )] // TODO: Remove default
     pub author: Uuid,
     #[serde(default = "Utc::now")]
     pub created: DateTime<Utc>,
-    #[serde(default)]
-    pub parts: Vec<Part>,
+    pub parts: Vec<QuizPart>,
 
     #[serde(default)]
     pub time_limit: Option<Duration>,
@@ -139,5 +148,5 @@ pub struct Quiz {
     #[serde(default)]
     pub begin_buffer: Option<Duration>,
     #[serde(default)]
-    pub participants: Vec<String>,
+    pub participants: Vec<QuizParticipant>,
 }

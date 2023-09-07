@@ -23,6 +23,7 @@ use crate::settings::{Settings, CONFIG_FILE_NAME};
 
 pub mod data;
 pub mod error;
+pub mod middleware;
 pub mod resp;
 pub mod role;
 pub mod route;

@@ -2,46 +2,56 @@ use bson::doc;
 use mongodb::Database;
 use rocket::form::Form;
 use rocket::http::private::cookie::CookieBuilder;
-use rocket::http::{CookieJar, Status};
+use rocket::http::{Cookie, CookieJar, Status};
 use rocket::serde::json::Json;
 use rocket::State;
+use utoipa::openapi::path::Parameter;
 use uuid::Uuid;
 
-use crate::data::user::db::problem as user_problem;
+use crate::data::user::db::{problem as user_problem, USER_COLLECTION_NAME};
 use crate::data::user::db::{CreateUserDbExt, UserLoginData, UserSignupData};
-use crate::data::user::{PasswordHash, UserResponse};
+use crate::data::user::{PasswordHash, User, UserResponse};
+use crate::middleware::paging::PageState;
 use crate::resp::jwt::{UserRoleToken, AUTH_COOKIE_NAME};
 use crate::resp::problem::Problem;
 use crate::role::Role;
 use crate::security::Security;
 use crate::settings::Settings;
 
-/* TODO: Support paging
-// Responder isn't implemented for Vec.
+/// Get list of users
+#[utoipa::path(
+    params(
+        ("from", description = "user Uuid to start pagination from", nullable = true, format = Uuid),
+        ("length", description = "number of users to return", nullable = true, format = Int32)
+    ),
+    responses(
+        (status = 401, description = "Missing/expired token", body = Problem),
+        (status = 200, description = "List of users", body = Json<Vec<UserResponse>>)
+    ),
+    security(
+        ("jwt" = [])
+    )
+)]
 #[get("/")]
-pub async fn user_list(db: &State<Database>) -> Result<Vec<User>, Problem> {
-    let mut user_cursor = db.collection(USER_COLLECTION_NAME)
-        .find(None, None)
-        .await
-        .map_err(|e| Problem::from(e))?;
-
-    let mut users: Vec<User> = vec![];
-    while let Some(user_result) = user_cursor.next().await {
-        let user_document = Bson::Document(user_result.unwrap());
-        match from_bson(user_document) {
-            Ok(user) => {
-                users.push(user)
-            }
-            Err(_) => {
-                // show must go on?
-                warn!("Unable to deserialize User document.")
-            }
-        }
+pub async fn user_list(
+    paging: PageState<'_, Uuid>,
+    auth: UserRoleToken,
+    db: &State<Database>,
+) -> Result<Json<Vec<UserResponse>>, Problem> {
+    if auth.role > Role::Normal {
+        return Err(Problem::new_untyped(
+            Status::Unauthorized,
+            "can't list users",
+        ));
     }
 
-    Ok(users)
+    let users = paging
+        .page_over(USER_COLLECTION_NAME, "_id")
+        .entries(db)
+        .await?
+        .map(|it| it.into());
+    Ok(Json(users))
 }
-*/
 
 /// Get information about the user
 #[utoipa::path(
@@ -99,6 +109,18 @@ pub async fn user_create<'a>(
     cookies.add(token.cookie(&security.jwt_keys.private)?);
 
     Ok(Json(UserResponse::from(user)))
+}
+
+// Logout current user
+#[utoipa::path(
+    responses(
+        (status = 200, description = "User logged out")
+    )
+)]
+#[post("/user/logout")]
+#[tracing::instrument]
+pub async fn user_logout<'a>(cookies: &'a CookieJar<'_>) {
+    cookies.remove(Cookie::named(AUTH_COOKIE_NAME));
 }
 
 /// Login via a login form

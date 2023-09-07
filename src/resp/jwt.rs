@@ -128,6 +128,7 @@ pub mod doc {
         fn into(self) -> SecurityScheme {
             let mut http = Http::new(HttpAuthScheme::Bearer);
             http.bearer_format = Some("JWT".to_string());
+            http.scheme = HttpAuthScheme::Bearer;
             SecurityScheme::Http(http)
         }
     }

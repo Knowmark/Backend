@@ -39,7 +39,7 @@ pub async fn quiz_list(db: &State<Database>) -> Result<Json<Vec<Quiz>>, Problem>
     Ok(Json(quizzes))
 }
 
-/// Crate a quiz
+/// Create a quiz
 #[utoipa::path(request_body = Quiz)]
 #[post("/quiz", format = "application/json", data = "<quiz>")]
 #[tracing::instrument]

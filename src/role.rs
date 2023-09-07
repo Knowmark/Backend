@@ -2,11 +2,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, ToSchema)]
-#[repr(u8)]
 pub enum Role {
+    #[schema(rename = "None")]
     None,
+    #[schema(rename = "Normal")]
     Normal,
+    #[schema(rename = "Author")]
     Author,
+    #[schema(rename = "Admin")]
     Admin,
 }
 

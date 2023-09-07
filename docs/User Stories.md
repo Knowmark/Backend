@@ -1,6 +1,9 @@
 ## Student
 As a student, when I:
 
+- start using the app for the first time
+  - I don't want to have to create an account
+  
 - open my **dashboard**,
   - I need to see all the things I need to do today.
   - I want to see all upcomming activities for the following week.
