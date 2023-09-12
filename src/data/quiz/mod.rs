@@ -12,9 +12,10 @@ fn true_bool() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "t", content = "value")]
-pub enum AnswerKind {
-    Bool,
+#[non_exhaustive]
+pub enum QuestionKind {
+    Bool { answer: bool },
+    /*
     Number,
     Short,
     Long,
@@ -30,6 +31,7 @@ pub enum AnswerKind {
         #[serde(default = "true_bool")]
         shuffle: bool,
     },
+    */
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -72,21 +74,17 @@ pub enum QuizPart {
         title: String,
         text: String,
     },
-    Interact {
+    Question {
         #[serde(default = "Uuid::new_v4")]
         id: Uuid,
         text: String,
-        kind: AnswerKind,
-        #[serde(default)]
-        choices: Vec<AnswerChoice>,
+        kind: QuestionKind,
 
+        #[serde(default)]
         time_limit: Option<Duration>,
 
-        value: f32,
-        /// Specifies a correct answer
-        validation: Option<AnswerValidation>,
         /// Allow partial answers
-        #[serde(default = "true_bool")]
+        #[serde(default)]
         partial: bool,
     },
 }
@@ -149,4 +147,54 @@ pub struct Quiz {
     pub begin_buffer: Option<Duration>,
     #[serde(default)]
     pub participants: Vec<QuizParticipant>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub enum PartAnswer {
+    Bool { answer: bool },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct QuizAnswers {
+    pub user: Uuid,
+    #[serde(default)]
+    pub date: DateTime<Utc>,
+    pub answers: HashMap<Uuid, PartAnswer>,
+}
+
+#[derive(Debug, Default, Serialize, ToSchema)]
+pub struct ValidationResult {
+    pub total_questions: usize,
+    pub correct_answers: usize,
+}
+
+impl QuizAnswers {
+    pub fn validate(&self, quiz: &Quiz) -> ValidationResult {
+        let mut result = ValidationResult::default();
+        for part in &quiz.parts {
+            if let QuizPart::Question {
+                id,
+                text,
+                kind,
+                partial,
+                ..
+            } = part
+            {
+                result.total_questions += 1;
+                match kind {
+                    QuestionKind::Bool { answer } => {
+                        if let Some(PartAnswer::Bool {
+                            answer: user_answer,
+                        }) = self.answers.get(id)
+                        {
+                            if user_answer == answer {
+                                result.correct_answers += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
 }

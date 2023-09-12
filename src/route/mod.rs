@@ -34,19 +34,24 @@ use crate::{
         quiz_list,
         quiz_create,
         quiz_info,
-        quiz_delete
+        quiz_delete,
+        quiz_submit_answers
     ),
     components(schemas(
         Role,
         qd::Quiz,
         qd::QuizPart,
-        qd::AnswerKind,
+        qd::PartAnswer,
+        qd::QuizAnswers,
+        qd::ValidationResult,
+        qd::QuestionKind,
         qd::AnswerValidation,
         qd::AnswerChoice,
         qd::QuizParticipant,
         cd::ClassRole,
         cdbd::ClassCreateData,
         cdbd::AddUserData,
+        QuizListResponse,
         UserResponse,
         udbd::UserLoginData,
         udbd::UserSignupData<'_>,
@@ -92,7 +97,8 @@ pub fn api_v1() -> Vec<Route> {
         quiz_list,
         quiz_create,
         quiz_info,
-        quiz_delete
+        quiz_delete,
+        quiz_submit_answers
     ]
 }
 

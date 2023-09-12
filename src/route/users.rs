@@ -20,19 +20,15 @@ use crate::settings::Settings;
 
 /// Get list of users
 #[utoipa::path(
-    params(
-        ("from", description = "user Uuid to start pagination from", nullable = true, format = Uuid),
-        ("length", description = "number of users to return", nullable = true, format = Int32)
-    ),
     responses(
         (status = 401, description = "Missing/expired token", body = Problem),
-        (status = 200, description = "List of users", body = Json<Vec<UserResponse>>)
+        (status = 200, description = "List of users", body = Vec<UserResponse>)
     ),
     security(
         ("jwt" = [])
     )
 )]
-#[get("/")]
+#[get("/user")]
 pub async fn user_list(
     paging: PageState<'_, Uuid>,
     auth: UserRoleToken,
@@ -49,7 +45,9 @@ pub async fn user_list(
         .page_over(USER_COLLECTION_NAME, "_id")
         .entries(db)
         .await?
-        .map(|it| it.into());
+        .into_iter()
+        .map(|it: User| it.into())
+        .collect();
     Ok(Json(users))
 }
 
@@ -157,7 +155,12 @@ pub async fn login_submit<'a>(
     }
 
     let urt = UserRoleToken::new(&user);
-    cookies.add(urt.cookie(&security.jwt_keys.private)?);
+    let cookie = urt.cookie(&security.jwt_keys.private)?;
+    cookies.add(cookie);
+    tracing::debug!(
+        "This cookie: {:?}",
+        cookies.get_pending(crate::resp::jwt::AUTH_COOKIE_NAME)
+    );
 
     Ok(UserResponse::from(user))
 }

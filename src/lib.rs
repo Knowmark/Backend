@@ -12,7 +12,7 @@ use error::BackendError;
 use mongodb::Client;
 use rocket::http::Method;
 use rocket::{Config, Rocket};
-use rocket_cors::{AllowedHeaders, AllowedOrigins};
+use rocket_cors::{AllowedHeaders, AllowedOrigins, Origins};
 use std::process::exit;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -73,7 +73,12 @@ pub async fn create(log_level: Option<Level>) -> Result<Rocket<rocket::Build>, B
     let mut r = rocket::build().manage(settings).manage(db).manage(security);
 
     tracing::info!("Setting up CORS...");
-    let allowed_origins = AllowedOrigins::All;
+    let allowed_origins = rocket_cors::AllOrSome::some_exact(&[
+        "http://localhost:5173/",
+        "https://localhost:5173/",
+        "http://localhost:8000/",
+        "https://localhost:8000/",
+    ]);
 
     // You can also deserialize this
     let cors = rocket_cors::CorsOptions {

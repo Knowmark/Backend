@@ -18,7 +18,7 @@ fn knowmark_service_main(arguments: Vec<OsString>) {
             eprintln!("{}", err);
         };
 
-        let r = knowmark_backend::create().await;
+        let r = knowmark_backend::create(Some(Level::INFO)).await;
         let r = match r.launch().await {
             Ok(r) => r,
             Err(e) => {

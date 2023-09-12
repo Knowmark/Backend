@@ -25,7 +25,7 @@ generate-security = ["rsa"]
 windows-service = { version = "0.6", optional = true }
 
 # Web
-rocket = { version = "0.5.0-rc", features = ["json", "uuid"] }
+rocket = { version = "=0.5.0-rc.3", features = ["json", "uuid"] }
 rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", rev = "985098d" }
 utoipa-swagger-ui = { git = "https://github.com/juhaku/utoipa", rev = "cf53488", features = [
     "rocket",

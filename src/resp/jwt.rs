@@ -52,11 +52,12 @@ impl UserRoleToken {
         private_key: impl AsRef<[u8]>,
     ) -> Result<Cookie<'static>, jsonwebtoken::errors::Error> {
         Ok(
+            // FIXME: Undo LAX Same-Site and domain once client is served by backend
             Cookie::build(AUTH_COOKIE_NAME, self.encode_jwt(private_key)?)
-                .secure(true)
                 .expires(OffsetDateTime::from_unix_timestamp(self.exp.timestamp()).ok())
-                .path("/")
-                .http_only(true)
+                //.path("/")
+                .same_site(rocket::http::SameSite::None)
+                .secure(false)
                 .finish(),
         )
     }
